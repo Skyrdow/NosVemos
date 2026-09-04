@@ -46,3 +46,4 @@ create policy "anon leer participantes" on public.participants for select using 
 create policy "anon insert participantes" on public.participants for insert with check (true);
 create policy "anon leer slots"      on public.slots        for select using (true);
 create policy "anon insert slots"    on public.slots        for insert with check (true);
+create policy "anon delete slots"    on public.slots        for delete using (true);

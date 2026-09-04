@@ -27,6 +27,14 @@ export class MemoryDataLayer implements DataLayer {
   private slots = new Map<string, Slot>()
   private listeners = new Map<string, Set<Listener>>()
 
+  /** Vacía todos los datos. Útil en tests para aislar entre casos. */
+  reset(): void {
+    this.meetings.clear()
+    this.participants.clear()
+    this.slots.clear()
+    this.listeners.clear()
+  }
+
   async createMeeting(data: NewMeeting): Promise<Meeting> {
     const meeting: Meeting = {
       id: cuid(),

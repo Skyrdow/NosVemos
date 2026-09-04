@@ -180,11 +180,10 @@ export class SupabaseDataLayer implements DataLayer {
         { event: '*', schema: 'public', table: 'participants', filter: `meeting_id=eq.${meetingId}` },
         onChange,
       )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'slots', filter: `participant_id=in.(${meetingId})` },
-        onChange,
-      )
+      // MVP: no se puede filtrar slots por reunión sin join; se escucha la
+      // tabla entera y el callback recarga solo los datos de esta reunión
+      // (lectura idempotente y barata a esta escala).
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slots' }, onChange)
       .subscribe()
     return () => {
       void this.client.removeChannel(channel)

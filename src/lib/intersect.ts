@@ -75,14 +75,14 @@ export function isValidRange(range: [number, number]): boolean {
 export function mergeRanges(ranges: [number, number][]): [number, number][] {
   if (ranges.length === 0) return []
   const sorted = [...ranges].sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  const merged: [number, number][] = [sorted[0]]
-  for (let i = 1; i < sorted.length; i++) {
-    const [s, e] = sorted[i]
+  const merged: [number, number][] = []
+  for (const [s, e] of sorted) {
     const last = merged[merged.length - 1]
-    if (s <= last[1]) {
-      // Se tocan o solapan → unir
+    if (last !== undefined && s <= last[1]) {
+      // Se tocan o solapan → unir (siempre sobre una tupla propia del resultado)
       last[1] = Math.max(last[1], e)
     } else {
+      // Copia nueva: nunca se reutiliza una tupla del input
       merged.push([s, e])
     }
   }

@@ -105,6 +105,38 @@ describe('computeIntersections — casos obligatorios', () => {
     expect(konkCells.every((c: Cell) => c.freeCount === 2)).toBe(true)
   })
 
+  it('mergeRanges no muta las tuplas del input (devuelve copias nuevas)', () => {
+    const input: [number, number][] = [
+      [9 * 60, 12 * 60],
+      [11 * 60, 14 * 60],
+    ]
+    const merged = mergeRanges(input)
+    expect(merged).toEqual([[9 * 60, 14 * 60]])
+    // El input queda intacto, incluida la primera tupla (antes se mutaba en el merge)
+    expect(input).toEqual([
+      [9 * 60, 12 * 60],
+      [11 * 60, 14 * 60],
+    ])
+    // Y el resultado no comparte referencias con el input
+    expect(merged[0]).not.toBe(input[0])
+  })
+
+  it('computeIntersections no muta las reglas del slot de entrada', () => {
+    const inputSlot: ParticipantSlot = slot('a', 'Ana', [
+      weekly(4, [
+        [9 * 60, 11 * 60],
+        [10 * 60, 13 * 60],
+      ]),
+    ])
+    const original = JSON.stringify(inputSlot.rules[0]!.ranges)
+    computeIntersections([inputSlot], 30)
+    expect(inputSlot.rules[0]!.ranges).toEqual([
+      [9 * 60, 11 * 60],
+      [10 * 60, 13 * 60],
+    ])
+    expect(JSON.stringify(inputSlot.rules[0]!.ranges)).toBe(original)
+  })
+
   it('híbrido weekly + one_off sobre la misma persona', () => {
     const slots = [
       slot('a', 'Ana', [

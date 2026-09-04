@@ -2,7 +2,30 @@
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   color: #213547;
-  background-color: #ffffff;
+  background-color: #f7f7f5;
+
+  --text: #213547;
+  --heading: #10141a;
+  --muted: #6b7280;
+  --border: #e4e2dd;
+  --border-strong: #c9c6c0;
+  --surface: #ffffff;
+  --input-bg: #ffffff;
+  --accent: #2f6fed;
+  --accent-strong: #1f56c8;
+  --danger: #c0392b;
+  --ok: #1e7d32;
+  --ok-border: #a5d6a7;
+
+  /* Celdas de grilla */
+  --cell-free: #4caf50;
+  --cell-free-text: #ffffff;
+  --cell-free-bg: #e8f5e9;
+  --cell-partial: #ffd54f;
+  --cell-partial-text: #5a4400;
+  --cell-partial-bg: #fff8e1;
+  --cell-none: #ececea;
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -11,8 +34,27 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #242424;
+    color: rgba(255, 255, 255, 0.88);
+    background-color: #16181d;
+
+    --text: rgba(255, 255, 255, 0.88);
+    --heading: #f4f5f7;
+    --muted: #9aa0aa;
+    --border: #2c2f36;
+    --border-strong: #3d414b;
+    --surface: #1e2127;
+    --input-bg: #262a32;
+    --accent: #4f83f5;
+    --accent-strong: #6b97f7;
+    --danger: #ff6b60;
+    --ok: #7fd18a;
+    --ok-border: #2e3b30;
+
+    --cell-free: #2e7d32;
+    --cell-free-bg: #1e2e20;
+    --cell-partial: #a08400;
+    --cell-partial-bg: #322c14;
+    --cell-none: #22252b;
   }
 }
 
@@ -23,12 +65,8 @@
 body {
   margin: 0;
   min-height: 100svh;
-  display: flex;
-  flex-direction: column;
 }
 
 #root {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  min-height: 100svh;
 }

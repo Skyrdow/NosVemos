@@ -1,32 +1,110 @@
-# React + TypeScript + Vite
+# NosVemos
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+App web para coordinar reuniones por disponibilidad: un único link, cada
+participante marca sus horas libres y la app calcula en qué franjas **todos**
+pueden reunirse.
 
-Currently, two official plugins are available:
+- **Stack**: React 18 + TypeScript + Vite + react-router (SPA)
+- **DB**: Supabase (Postgres + Realtime), accedida solo a través del data layer
+- **Deploy**: Vercel
+- **UI en español**, CSS plano (sin UI kit ni Tailwind)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Requisitos
 
-## React Compiler
+- Node 20+
+- npm
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Puesta en marcha (modo local, sin Supabase)
 
-## Expanding the Oxlint configuration
+La app funciona 100% con un data layer **en memoria** (gracias a
+`VITE_USE_LOCAL=true`): ideal para desarrollo, preview y tests.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+cp .env.example .env.local   # ya trae VITE_USE_LOCAL=true
+npm run dev                  # http://localhost:5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Los tests corren siempre contra la capa en memoria, sin credenciales:
+
+```bash
+npm test       # vitest
+npm run lint   # typecheck + oxlint
+npm run build  # typecheck + build de producción
+```
+
+## Integración con Supabase (paso a paso)
+
+1. Creá un proyecto en [Supabase](https://supabase.com) (Plan Free alcanza).
+2. En **SQL Editor** → New query, pegá el contenido de `supabase/schema.sql` y
+   ejecutalo. Crea las tablas `meetings`, `participants`, `slots`, índices y las
+   políticas RLS anónimas (MVP de link compartido). Nota: `slots` incluye
+   política `select`/`insert`/`delete` — el `delete` es necesario porque
+   `saveSlots` reemplaza las reglas borrando las anteriores antes de insertar.
+3. En **Project Settings → API**, copiá:
+   - `Project URL` → `VITE_SUPABASE_URL`
+   - `anon public` key → `VITE_SUPABASE_ANON_KEY` (clave **publishable**, segura en el cliente)
+4. Editá `.env.local`:
+
+   ```dotenv
+   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+   VITE_SUPABASE_ANON_KEY=tu_publishable_key
+   VITE_USE_LOCAL=false
+   ```
+
+   > Con `VITE_USE_LOCAL=true` la app usa la capa en memoria aunque haya
+   > credenciales. Sin las tres variables también cae en memoria (modo seguro).
+
+5. Reiniciá `npm run dev` (o `npm run build && npm run preview`).
+
+### Realtime
+
+La suscripción a cambios (nuevos participantes / nuevos aportes) se hace por
+Realtime: `participants` (filtrados por reunión) y `slots` se escuchan y la
+grilla se recalcula al vuelo. En modo memoria, el data layer emite los mismos
+eventos localmente.
+
+## Seguridad
+
+- **Nunca** commitear `.env.local` ni claves (está en `.gitignore`).
+- La clave `anon` (`sb_publishable_*`) es pública por diseño y puede ir en el cliente.
+- La clave `service_role` (`sb_secret_*`) es solo admin/servidor: **no** va en el repo
+  ni en el frontend.
+
+## Estructura
+
+```
+src/
+  lib/
+    intersect.ts          # motor de intersección (TS puro, el más testeado)
+    intersect.test.ts     # casos obligatorios + perf smoke
+    rules.ts              # helpers puros reglas ↔ slots ↔ selección
+    supabase.ts           # cliente Supabase desde import.meta.env
+    utils.ts              # slugs, fechas, sessionStorage
+    data/
+      types.ts            # interfaz única del data layer
+      memoryDataLayer.ts  # implementación en memoria (dev/tests)
+      supabaseDataLayer.ts# implementación real (Postgres + Realtime)
+      index.ts            # exporta la capa activa según env
+  pages/
+    CreateMeeting.tsx     # /  crear reunión
+    JoinMeeting.tsx       # /m/:slug  unirse/participar
+  components/
+    AvailabilityGrid.tsx  # input de disponibilidad (clic/arrastre)
+    ResultGrid.tsx        # grilla agregada con colores y detalle
+    NamePrompt.tsx        # pedido de nombre al participar
+    __tests__/            # tests de componentes
+  App.tsx                 # rutas de la SPA
+  App.css / index.css     # estilos
+supabase/schema.sql       # esquema SQL (aplicar una vez en Supabase)
+vercel.json               # build + rewrites SPA (/m/:slug → index.html)
+```
+
+## Despliegue en Vercel
+
+`vercel.json` ya configura todo: `npm run build` → `dist`, con rewrite SPA para
+`/m/:slug`. En Vercel agregá las mismas variables de entorno de `.env.local`.
+
+## Spec
+
+El documento rector es `SPEC.md` (producto, motor, esquema y criterios de calidad).
