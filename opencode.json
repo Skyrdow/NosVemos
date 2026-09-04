@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "agent": {
+    "builder": {
+      "mode": "subagent",
+      "description": "Construye la app web (React + Vite + TS)"
+    },
+    "evaluator": {
+      "mode": "subagent",
+      "description": "Evalúa el trabajo del builder sin editar código"
+    }
+  },
+  "command": {
+    "build-feature": {
+      "description": "Construye una feature con el builder y la evalúa con el evaluador",
+      "template": "Coordiná al agente $ARGUMENTS:\n\n1. El agente **builder** implementa la feature solicitada.\n2. Luego el agente **evaluator** revisa y evalúa el trabajo.\n3. Si el evaluador pide cambios, hacé que el builder los corrija y volvé a evaluar hasta que el veredicto sea APPROVE.\n4. Informá el veredicto final y el resumen de hallazgos."
+    }
+  }
+}
