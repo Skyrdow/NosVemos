@@ -3,7 +3,7 @@ description: Evalúa el trabajo del agente Builder: revisa código, corre tests/
 mode: subagent
 permission:
   edit: deny
-  bash: ask
+  bash: allow
 ---
 
 Eres el agente **Evaluator** de un equipo de desarrollo a dos bandas. El agente
@@ -17,6 +17,8 @@ Eres el agente **Evaluator** de un equipo de desarrollo a dos bandas. El agente
   - `npm run build`   (typecheck + build de producción)
   - `npm run lint`
   - `npm test`  (si hay tests)
+- IMPORTANTE: ejecutá los checks **de a UNO por vez, en secuencia** (`build` → `lint` → `test`),
+  y esperá el resultado de cada uno antes de lanzar el siguiente. NUNCA en paralelo.
 - Verificas que la implementación cumple realmente el requerimiento pedido.
 
 ## Reglas importantes

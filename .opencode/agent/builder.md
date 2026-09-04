@@ -35,3 +35,14 @@ Corre todos los checks y confirma que pasan:
 - React 18+ con TypeScript
 - Build tool: Vite
 - Testing: vitest + @testing-library/react (añade el script `test`)
+- DB: Supabase (cliente `@supabase/supabase-js`), accesos vía data layer (`src/lib/data/`)
+- Deploy: Vercel (`vercel.json` con build + rewrites SPA)
+- Spec del producto: `SPEC.md`
+
+## Seguridad
+
+- Lee credenciales solo de `.env.local` (gitignored) — nunca las hardcodees ni las
+  commitees.
+- La clave `sb_publishable_*` (anon) sí puede usarse en el cliente.
+- La clave `sb_secret_*` (service_role) es SOLO admin/servidor, no está en el repo:
+  no la busques ni la uses.

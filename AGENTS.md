@@ -7,6 +7,15 @@ Convenciones compartidas para los agentes de este proyecto (Builder y Evaluator)
 - React 18+ + TypeScript
 - Build tool: Vite
 - Testing: vitest + @testing-library/react
+- DB: Supabase (Postgres + Realtime)
+- Deploy: Vercel
+- Spec del producto: `SPEC.md` (el documento rector de lo que se construye)
+
+## Seguridad (IMPORTANTE)
+
+- **Nunca** commitear `.env.local` ni claves.
+- La clave `sb_publishable_*` (anon) va en `.env.local` — es pública por diseño.
+- La clave `sb_secret_*` (service_role) JAMÁS en el repo ni en el frontend. Solo admin/servidor.
 
 ## Estructura
 
