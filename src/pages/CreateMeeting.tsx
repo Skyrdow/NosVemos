@@ -21,11 +21,11 @@ export default function CreateMeeting() {
   async function handleCreateMeeting() {
     const name = normalizeName(creatorName)
     if (normalizeName(title) === '') {
-      setError('Poné un título a la reunión.')
+      setError('Pon un título a la reunión.')
       return
     }
     if (name === '') {
-      setError('Contanos tu nombre: serás el primer participante.')
+      setError('Cuéntanos tu nombre: serás el primer participante.')
       return
     }
 
@@ -59,9 +59,9 @@ export default function CreateMeeting() {
         navigate(`/m/${meeting.slug}`)
         return
       }
-      setError('No se pudo generar un enlace único. Intentá de nuevo.')
+      setError('No se pudo generar un enlace único. Intenta de nuevo.')
     } catch {
-      setError('Ocurrió un error al crear la reunión. Intentá de nuevo.')
+      setError('Ocurrió un error al crear la reunión. Intenta de nuevo.')
     } finally {
       setSubmitting(false)
     }
@@ -71,7 +71,7 @@ export default function CreateMeeting() {
     <section className="create" aria-labelledby="create-title">
       <h2 id="create-title">Crear una reunión</h2>
       <p className="create__lead">
-        Generá un link único, compartilo y la app calcula en qué franjas TODOS
+        Genera un link único, compártelo y la app calcula en qué franjas TODOS
         están libres.
       </p>
 

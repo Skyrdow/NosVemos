@@ -1,5 +1,10 @@
 -- Esquema "NosVemos" (coordinación de reuniones por disponibilidad)
--- Aplicar una vez en la consola SQL de Supabase.
+-- Destructivo: borra las tablas existentes antes de recrearlas.
+-- Aplicar con cuidado (la consola SQL de Supabase no pide confirmación).
+
+drop table if exists public.slots;
+drop table if exists public.participants;
+drop table if exists public.meetings;
 
 create table public.meetings (
   id uuid primary key default gen_random_uuid(),

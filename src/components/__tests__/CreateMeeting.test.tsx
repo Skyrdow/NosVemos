@@ -46,7 +46,7 @@ describe('flujo crear reunión', () => {
 
     await user.click(screen.getByRole('button', { name: 'Crear reunión' }))
     expect(
-      await screen.findByText(/Poné un título a la reunión/),
+      await screen.findByText(/Pon un título a la reunión/),
     ).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Título de la reunión'), 'Demo')

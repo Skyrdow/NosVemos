@@ -13,7 +13,6 @@ import {
   addDaysISO,
   dateInRange,
   formatMinutes,
-  formatShortDate,
   getRememberedParticipant,
   isCreatorOf,
   mondayOf,
@@ -23,10 +22,10 @@ import {
 } from '../lib/utils'
 
 type LoadState = 'loading' | 'ready' | 'notfound' | 'error'
-type MeetingView = 'week' | 'calendar'
 
-/** Para reuniones legacy "hybrid": el input se trata como semana recurrente. */
-function effectiveAgenda(agendaType: Meeting['agendaType']): string {
+/** Para reuniones legacy "hybrid": el input y los resultados se tratan como
+ *  semana recurrente. El modo de vista nace solo del tipo de agenda. */
+function effectiveAgenda(agendaType: Meeting['agendaType']): 'weekly' | 'one_off' {
   return agendaType === 'one_off' ? 'one_off' : 'weekly'
 }
 
@@ -43,9 +42,10 @@ export default function JoinMeeting() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [duplicateWarning, setDuplicateWarning] = useState(false)
 
-  // Vista de resultados y semana seleccionada (default: semana actual).
-  const [meetingView, setMeetingView] = useState<MeetingView>('week')
+// Modo one_off: el calendario compartido controla el día activo (la semana que
+// muestra el input con sus 7 fechas) y la semana de resultados. Default: hoy.
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => mondayOf(todayISO()))
+  const [activeDate, setActiveDate] = useState(() => todayISO())
   // Popup de "Opciones de la reunión" (solo anfitrión).
   const [optionsOpen, setOptionsOpen] = useState(false)
 
@@ -135,24 +135,61 @@ export default function JoinMeeting() {
     return (slotsBy.get(me.id) ?? []).map(slotToRule)
   }, [me, slotsBy])
 
-  // Filtro de la vista "Semana": semanales siempre + one_off dentro de la semana.
-  const weekEnd = useMemo(() => addDaysISO(selectedWeekStart, 6), [selectedWeekStart])
-  const weekCells = useMemo(() => {
-    if (meetingView !== 'week') return []
+  // El modo de vista viene SOLO del tipo de agenda (weekly/hybrid → semana
+  // recurrente; one_off → calendario compartido + resultados + input a la vez).
+  const agenda: 'weekly' | 'one_off' =
+    meeting === null ? 'weekly' : effectiveAgenda(meeting.agendaType)
+
+  // Modo "Semana": los resultados muestran SIEMPRE la semana actual (sin
+  // selector ni header): columnas recurrentes Lun–Dom + one_off en esa semana.
+  const currentWeekStart = useMemo(() => mondayOf(todayISO()), [])
+  const currentWeekEnd = useMemo(
+    () => addDaysISO(currentWeekStart, 6),
+    [currentWeekStart],
+  )
+
+  // Modo one_off: semana elegida en el calendario compartido.
+  const selectedWeekEnd = useMemo(
+    () => addDaysISO(selectedWeekStart, 6),
+    [selectedWeekStart],
+  )
+  // Las 7 fechas (lun..dom) de esa semana: los resultados las muestran SIEMPRE.
+  const selectedWeekDates = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDaysISO(selectedWeekStart, i)),
+    [selectedWeekStart],
+  )
+
+  const resultCells = useMemo(() => {
+    if (agenda === 'one_off') {
+      return cells.filter(
+        (c) =>
+          c.date !== undefined &&
+          dateInRange(c.date, selectedWeekStart, selectedWeekEnd),
+      )
+    }
     return cells.filter(
       (c) =>
         c.dayOfWeek !== undefined ||
-        (c.date !== undefined && dateInRange(c.date, selectedWeekStart, weekEnd)),
+        (c.date !== undefined &&
+          dateInRange(c.date, currentWeekStart, currentWeekEnd)),
     )
-  }, [cells, meetingView, selectedWeekStart, weekEnd])
-  const weekAllFree = useMemo(() => {
-    if (meetingView !== 'week') return []
+  }, [agenda, cells, selectedWeekStart, selectedWeekEnd, currentWeekStart, currentWeekEnd])
+
+  const resultAllFree = useMemo(() => {
+    if (agenda === 'one_off') {
+      return allFreeRanges.filter(
+        (r) =>
+          r.date !== undefined &&
+          dateInRange(r.date, selectedWeekStart, selectedWeekEnd),
+      )
+    }
     return allFreeRanges.filter(
       (r) =>
         r.dayOfWeek !== undefined ||
-        (r.date !== undefined && dateInRange(r.date, selectedWeekStart, weekEnd)),
+        (r.date !== undefined &&
+          dateInRange(r.date, currentWeekStart, currentWeekEnd)),
     )
-  }, [allFreeRanges, meetingView, selectedWeekStart, weekEnd])
+  }, [agenda, allFreeRanges, selectedWeekStart, selectedWeekEnd, currentWeekStart, currentWeekEnd])
 
   // Días puntuales con algún aporte (marcados en el calendario de resultados).
   const filledDates = useMemo(() => {
@@ -182,7 +219,7 @@ export default function JoinMeeting() {
       setDuplicateWarning(isDuplicate)
       await loadData()
     } catch {
-      setLoadError('No se pudo registrar tu nombre. Intentá de nuevo.')
+      setLoadError('No se pudo registrar tu nombre. Intenta de nuevo.')
     } finally {
       setNamingBusy(false)
     }
@@ -199,7 +236,7 @@ export default function JoinMeeting() {
       setSavedMessage(true)
       window.setTimeout(() => setSavedMessage(false), 3000)
     } catch {
-      setLoadError('No se pudo guardar tu disponibilidad. Intentá de nuevo.')
+      setLoadError('No se pudo guardar tu disponibilidad. Intenta de nuevo.')
     } finally {
       setSaving(false)
     }
@@ -220,11 +257,6 @@ export default function JoinMeeting() {
     const updated = await dataLayer.updateMeeting(meeting.id, patch)
     setMeeting(updated)
     await loadData()
-  }
-
-  function handleSelectWeek(chosenMondayISO: string) {
-    setSelectedWeekStart(chosenMondayISO)
-    setMeetingView('week')
   }
 
   async function handleCopyLink() {
@@ -251,8 +283,8 @@ export default function JoinMeeting() {
       <section className="join join--empty">
         <h2>Reunión no encontrada</h2>
         <p>
-          El link <code>/m/{slug}</code> no corresponde a ninguna reunión. Verificá
-          que esté bien copiado o creá una nueva.
+          El link <code>/m/{slug}</code> no corresponde a ninguna reunión. Verifica
+          que esté bien copiado o crea una nueva.
         </p>
         <a className="btn" href="/">
           Crear una reunión
@@ -337,8 +369,8 @@ export default function JoinMeeting() {
       {duplicateWarning && me !== null && (
         <div className="join__warning" role="alert">
           <p>
-            El nombre «{me.name}» ya está en uso en esta reunión. Si no sos vos,
-            probá con otro, pero podés continuar.
+            El nombre «{me.name}» ya está en uso en esta reunión. Si no eres tú,
+            prueba con otro, pero puedes continuar.
           </p>
           <button
             type="button"
@@ -364,61 +396,45 @@ export default function JoinMeeting() {
               <span className="join__count">{participantsWithSlots.length}/{participants.length} con aportes</span>
             </h3>
 
-            <div className="join__toolbar">
-              <div className="join__views" role="tablist" aria-label="Vista de resultados">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={meetingView === 'week'}
-                  className={meetingView === 'week' ? 'is-active' : ''}
-                  onClick={() => setMeetingView('week')}
-                >
-                  Semana
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={meetingView === 'calendar'}
-                  className={meetingView === 'calendar' ? 'is-active' : ''}
-                  onClick={() => setMeetingView('calendar')}
-                >
-                  Calendario
-                </button>
-              </div>
-            </div>
-
-            {meetingView === 'calendar' ? (
-              <MonthCalendar
-                mondayISO={selectedWeekStart}
-                onSelectWeek={handleSelectWeek}
-                filledDates={filledDates}
-              />
-            ) : (
+            {agenda === 'one_off' ? (
               <>
-                <div className="join__week-header">
-                  <strong>
-                    Semana del {formatShortDate(selectedWeekStart)} al{' '}
-                    {formatShortDate(weekEnd)}
-                  </strong>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => setMeetingView('calendar')}
-                  >
-                    Elegir semana
-                  </button>
-                </div>
+                {/* Calendario compartido (único): elige día y semana; los
+                    resultados y el input siguen al día activo, todo a la vez. */}
+                <MonthCalendar
+                  mondayISO={selectedWeekStart}
+                  selectedDate={activeDate}
+                  filledDates={filledDates}
+                  onSelectDay={(day) => {
+                    setActiveDate(day)
+                    setSelectedWeekStart(mondayOf(day))
+                  }}
+                  onSelectWeek={(monday) => {
+                    setActiveDate(monday)
+                    setSelectedWeekStart(monday)
+                  }}
+                />
                 <ResultGrid
-                  key={`week:${meeting.granularityMin}:${selectedWeekStart}:${participants.length}:${slotsBy.size}`}
+                  key={`oneoff:${meeting.granularityMin}:${selectedWeekStart}:${participants.length}:${slotsBy.size}`}
                   granularityMin={meeting.granularityMin}
-                  cells={weekCells}
-                  allFreeRanges={weekAllFree}
+                  cells={resultCells}
+                  allFreeRanges={resultAllFree}
                   participants={participants}
                   timeStartMin={meeting.timeStartMin}
                   timeEndMin={meeting.timeEndMin}
-                  forceWeeklyDays
+                  forceWeekDates={selectedWeekDates}
                 />
               </>
+            ) : (
+              <ResultGrid
+                key={`week:${meeting.granularityMin}:${participants.length}:${slotsBy.size}`}
+                granularityMin={meeting.granularityMin}
+                cells={resultCells}
+                allFreeRanges={resultAllFree}
+                participants={participants}
+                timeStartMin={meeting.timeStartMin}
+                timeEndMin={meeting.timeEndMin}
+                forceWeeklyDays
+              />
             )}
           </section>
 
@@ -428,6 +444,7 @@ export default function JoinMeeting() {
               key={`av:${me.id}:${JSON.stringify(myRules)}`}
               granularityMin={meeting.granularityMin}
               agendaType={meeting.agendaType}
+              activeDate={activeDate}
               initialRules={myRules}
               onSave={handleSaveRules}
               saving={saving}

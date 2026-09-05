@@ -28,8 +28,8 @@ export default function NamePrompt({
 
   return (
     <section className="name-prompt" aria-labelledby="name-prompt-title">
-      <h2 id="name-prompt-title">Sumate a «{meetingTitle}»</h2>
-      <p>¿Cómo te llamás? Tu nombre se usará para identificar tus franjas.</p>
+      <h2 id="name-prompt-title">Súmate a «{meetingTitle}»</h2>
+      <p>¿Cómo te llamas? Tu nombre se usará para identificar tus franjas.</p>
       <form className="name-prompt__form" onSubmit={handleSubmit}>
         <label htmlFor="participant-name">Nombre</label>
         <input

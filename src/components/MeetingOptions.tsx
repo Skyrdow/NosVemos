@@ -12,12 +12,6 @@ interface MeetingOptionsProps {
 
 const GRANULARITIES = [15, 30, 60, 90, 120] as const
 
-// Rango horario en pasos de 30 min. El inicio admite hasta 23:30 y el fin
-// desde 00:30 para evitar rangos vacíos (inicio=24:00 o fin=00:00 dejarían la
-// grilla sin filas).
-const START_OPTIONS = Array.from({ length: 48 }, (_, i) => i * 30)
-const END_OPTIONS = Array.from({ length: 48 }, (_, i) => (i + 1) * 30)
-
 const AGENDA_OPTIONS: { value: AgendaType; label: string }[] = [
   { value: 'weekly', label: 'Semana' },
   { value: 'one_off', label: 'Calendario' },
@@ -87,7 +81,7 @@ export default function MeetingOptions({ meeting, onSave, onSaved }: MeetingOpti
       await onSave(patch)
       onSaved?.()
     } catch {
-      setError('No se pudieron guardar las opciones. Intentá de nuevo.')
+      setError('No se pudieron guardar las opciones. Intenta de nuevo.')
     } finally {
       setBusy(false)
     }
@@ -154,32 +148,38 @@ export default function MeetingOptions({ meeting, onSave, onSaved }: MeetingOpti
 
         <div className="field">
           <label htmlFor="options-time-start">Rango horario (desde)</label>
-          <select
-            id="options-time-start"
-            value={timeStartMin}
-            onChange={(e) => handleStartChange(Number(e.target.value))}
-          >
-            {START_OPTIONS.map((min) => (
-              <option key={min} value={min}>
-                {formatMinutes(min)}
-              </option>
-            ))}
-          </select>
+          <div className="range">
+            <input
+              type="range"
+              id="options-time-start"
+              min={0}
+              max={1410}
+              step={30}
+              value={Number(timeStartMin)}
+              onChange={(e) => handleStartChange(Number(e.target.value))}
+            />
+            <output htmlFor="options-time-start">
+              {formatMinutes(Number(timeStartMin))}
+            </output>
+          </div>
         </div>
 
         <div className="field">
           <label htmlFor="options-time-end">Rango horario (hasta)</label>
-          <select
-            id="options-time-end"
-            value={timeEndMin}
-            onChange={(e) => handleEndChange(Number(e.target.value))}
-          >
-            {END_OPTIONS.map((min) => (
-              <option key={min} value={min}>
-                {formatMinutes(min)}
-              </option>
-            ))}
-          </select>
+          <div className="range">
+            <input
+              type="range"
+              id="options-time-end"
+              min={30}
+              max={1440}
+              step={30}
+              value={Number(timeEndMin)}
+              onChange={(e) => handleEndChange(Number(e.target.value))}
+            />
+            <output htmlFor="options-time-end">
+              {formatMinutes(Number(timeEndMin))}
+            </output>
+          </div>
         </div>
       </div>
 
@@ -193,7 +193,7 @@ export default function MeetingOptions({ meeting, onSave, onSaved }: MeetingOpti
       {!previewHasRows && (
         <p className="options__hint" role="status">
           El rango horario elegido no deja ninguna franja con la granularidad
-          seleccionada. Ajustá el inicio, el fin o la granularidad.
+          seleccionada. Ajusta el inicio, el fin o la granularidad.
         </p>
       )}
 

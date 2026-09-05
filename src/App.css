@@ -156,6 +156,27 @@ select:focus-visible {
   color: var(--muted);
 }
 
+/* Slider de rango horario (desde/hasta): input flexible + valor en output. */
+.range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.range input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.range output {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--heading);
+  min-width: 44px;
+  text-align: right;
+}
+
 .create__error,
 .join__error,
 .name-prompt__error,
@@ -336,52 +357,6 @@ select:focus-visible {
   margin: 0;
   font-size: 14px;
   color: var(--text);
-}
-
-.join__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 14px;
-}
-
-.join__views {
-  display: flex;
-  gap: 6px;
-}
-
-.join__views button {
-  font-size: 13px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.join__views button.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.join__week-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.join__week-header strong {
-  color: var(--heading);
 }
 
 /* ===== Calendario mensual (elegir semana) ===== */
@@ -846,10 +821,6 @@ button.month__day--selected:hover {
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 10px;
-}
-
-.av-grid__calendar {
-  max-width: 720px;
 }
 
 .av-grid__day-title {

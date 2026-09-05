@@ -1,6 +1,6 @@
 import type { AgendaType } from '../lib/data/types'
 import { DAY_LABELS } from '../lib/intersect'
-import { formatMinutes } from '../lib/utils'
+import { addDaysISO, formatMinutes, formatShortDate, mondayOf, todayISO } from '../lib/utils'
 
 interface CalendarPreviewProps {
   granularityMin: number
@@ -33,6 +33,16 @@ export default function CalendarPreview({
   const last = Math.floor((timeEndMin - 1) / granularityMin)
   for (let b = first; b <= last; b++) buckets.push(b)
 
+  // Cabeceras según el modo: en "Semana" los nombres de día (Lun…Dom); en
+  // "Calendario" las 7 fechas de la semana de ejemplo (la actual), igual que
+  // se va a ver el input en modo calendario.
+  const headers: readonly string[] =
+    agendaType === 'one_off'
+      ? Array.from({ length: 7 }, (_, i) =>
+          formatShortDate(addDaysISO(mondayOf(todayISO()), i)),
+        )
+      : [...DAY_LABELS]
+
   return (
     <div
       className="cal-preview"
@@ -48,7 +58,7 @@ export default function CalendarPreview({
         style={{ gridTemplateColumns: `64px repeat(7, minmax(36px, 1fr))` }}
       >
         <div className="grid__corner" />
-        {DAY_LABELS.map((label) => (
+        {headers.map((label) => (
           <div key={label} className="grid__day-header">
             {label}
           </div>
@@ -58,7 +68,7 @@ export default function CalendarPreview({
             <div className="grid__time" aria-hidden="true">
               {formatMinutes(bucket * granularityMin)}
             </div>
-            {DAY_LABELS.map((label) => (
+            {headers.map((label) => (
               <div key={`${bucket}:${label}`} className="grid__cell grid__cell--none" />
             ))}
           </div>

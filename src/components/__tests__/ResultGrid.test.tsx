@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import ResultGrid from '../ResultGrid'
 import { computeIntersections, type ParticipantSlot } from '../../lib/intersect'
 import type { Participant } from '../../lib/data/types'
+import { formatShortDate } from '../../lib/utils'
 
 const participants: Participant[] = [
   { id: 'a', meetingId: 'm1', name: 'Ana', createdAt: '' },
@@ -211,5 +212,43 @@ describe('ResultGrid (grilla agregada)', () => {
     for (const label of ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
+  })
+
+  it('forceWeekDates muestra las 7 columnas de la semana con fechas', () => {
+    const dates = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ]
+    const slots: ParticipantSlot[] = [
+      {
+        participantId: 'a',
+        name: 'Ana',
+        rules: [{ kind: 'one_off', date: '2026-09-21', ranges: [[540, 570]] }],
+      },
+      {
+        participantId: 'b',
+        name: 'Ben',
+        rules: [{ kind: 'one_off', date: '2026-09-21', ranges: [[540, 570]] }],
+      },
+    ]
+    const { cells, allFreeRanges } = computeIntersections(slots, 30)
+    render(
+      <ResultGrid
+        granularityMin={30}
+        cells={cells}
+        allFreeRanges={allFreeRanges}
+        participants={participants}
+        forceWeekDates={dates}
+      />,
+    )
+
+    // Las 7 fechas (DD/MM) aparecen como cabeceras, aunque 5 días no tengan aportes.
+    for (const date of dates) {
+      expect(screen.getByText(formatShortDate(date))).toBeInTheDocument()
+    }
+    // La celda de aporte del lunes se ve con su fecha y su recuento.
+    expect(
+      screen.getByRole('button', { name: '21/09 09:00–09:30: 2 de 3 libres' }),
+    ).toBeInTheDocument()
   })
 })

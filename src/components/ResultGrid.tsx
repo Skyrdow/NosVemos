@@ -13,6 +13,9 @@ interface ResultGridProps {
   timeEndMin?: number
   /** Siempre muestra las columnas recurrentes Lun–Dom (vista "Semana"). */
   forceWeeklyDays?: boolean
+  /** Fuerza las 7 columnas de fecha (lun..dom, YYYY-MM-DD) aunque no tengan
+   *  aportes. Etiquetadas con DD/MM (vista "Calendario"). */
+  forceWeekDates?: string[]
 }
 
 interface DayGroup {
@@ -35,6 +38,7 @@ export default function ResultGrid({
   timeStartMin = 0,
   timeEndMin = 1440,
   forceWeeklyDays = false,
+  forceWeekDates,
 }: ResultGridProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [focus, setFocus] = useState<Cell | null>(null)
@@ -53,6 +57,18 @@ export default function ResultGrid({
           key: `w:${d}`,
           gridLabel: dayLabel(d),
           dayOfWeek: d,
+          byBucket: new Map(),
+        })
+      }
+    }
+    if (forceWeekDates !== undefined) {
+      // Vista "Calendario": las 7 fechas de la semana se muestran siempre,
+      // aunque algún día no tenga aportes (queda entero en gris).
+      for (const date of forceWeekDates) {
+        dates.set(date, {
+          key: `d:${date}`,
+          gridLabel: formatShortDate(date),
+          date,
           byBucket: new Map(),
         })
       }
@@ -91,7 +107,7 @@ export default function ResultGrid({
       (a.date ?? '').localeCompare(b.date ?? ''),
     )
     return [...orderedWeekly, ...orderedDates]
-  }, [cells, granularityMin, forceWeeklyDays])
+  }, [cells, granularityMin, forceWeeklyDays, forceWeekDates])
 
   const { minBucket, maxBucket } = useMemo(() => {
     if (cells.length === 0) return { minBucket: 0, maxBucket: -1 }
@@ -133,7 +149,7 @@ export default function ResultGrid({
     return (
       <div className="result" data-testid="result-empty">
         <p className="result__empty">
-          Todavía no hay aportes de disponibilidad. Compartí el link para que los
+          Todavía no hay aportes de disponibilidad. Comparte el link para que los
           participantes marquen sus franjas libres.
         </p>
       </div>

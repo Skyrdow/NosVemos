@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import App from '../../App'
 import { dataLayer } from '../../lib/data'
-import { rememberCreator, rememberParticipant } from '../../lib/utils'
+import { formatShortDate, rememberCreator, rememberParticipant, todayISO, addDaysISO, mondayOf } from '../../lib/utils'
 
 async function createMeetingFixture() {
   const meeting = await dataLayer.createMeeting({
@@ -35,7 +35,7 @@ describe('flujo unirse a una reunión', () => {
     )
 
     expect(
-      await screen.findByText(/Sumate a «Retro quincenal»/i),
+      await screen.findByText(/Súmate a «Retro quincenal»/i),
     ).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Nombre'), 'Cris')
@@ -63,7 +63,7 @@ describe('flujo unirse a una reunión', () => {
     expect(
       await screen.findByText(/Tu disponibilidad \(Ana\)/i),
     ).toBeInTheDocument()
-    expect(screen.queryByText(/Sumate a/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Súmate a/)).not.toBeInTheDocument()
   })
 
   it('marcar franja → guarda slots y la grilla resalta allFree con el recuento', async () => {
@@ -160,7 +160,7 @@ describe('flujo unirse a una reunión', () => {
     )
 
     // Sin registro de creador en este dispositivo no aparece el botón.
-    expect(await screen.findByText(/Sumate a/)).toBeInTheDocument()
+    expect(await screen.findByText(/Súmate a/)).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: /Opciones/ }),
     ).not.toBeInTheDocument()
@@ -287,5 +287,91 @@ describe('flujo unirse a una reunión', () => {
       expect(await dataLayer.getSlots(ana.id)).toHaveLength(1)
       expect(await dataLayer.getSlots(ben.id)).toHaveLength(1)
     })
+  })
+
+  it('reunión semanal: resultado e input a la vez, sin calendario ni toggle', async () => {
+    const meeting = await createMeetingFixture()
+    const participants = await dataLayer.getParticipants(meeting.id)
+    const ana = participants.find((p) => p.name === 'Ana')!
+    sessionStorage.clear()
+    rememberParticipant(meeting.id, ana.id)
+
+    render(
+      <MemoryRouter initialEntries={[`/m/${meeting.slug}`]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // El fixture es hybrid → el modo es semana recurrente.
+    expect(await screen.findByText(/Tu disponibilidad \(Ana\)/i)).toBeInTheDocument()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('month-calendar')).not.toBeInTheDocument()
+    // Resultados (todavía sin aportes) e input visibles a la vez.
+    expect(screen.getByTestId('result-empty')).toBeInTheDocument()
+    expect(screen.getByText(/Disponibilidad agregada/i)).toBeInTheDocument()
+  })
+
+  it('reunión one_off: un solo calendario muestra resultados y edición a la vez', async () => {
+    const user = userEvent.setup()
+    const meeting = await dataLayer.createMeeting({
+      slug: 'cine01',
+      title: 'Salida al cine',
+      timezone: 'UTC',
+      granularityMin: 60,
+      timeStartMin: 480,
+      timeEndMin: 1200,
+      agendaType: 'one_off',
+      creatorName: 'Ana',
+    })
+    await dataLayer.registerParticipant({ meetingId: meeting.id, name: 'Ana' })
+    await dataLayer.registerParticipant({ meetingId: meeting.id, name: 'Ben' })
+    const participants = await dataLayer.getParticipants(meeting.id)
+    const ana = participants.find((p) => p.name === 'Ana')!
+    sessionStorage.clear()
+    rememberParticipant(meeting.id, ana.id)
+    rememberCreator(meeting.id)
+
+    render(
+      <MemoryRouter initialEntries={[`/m/${meeting.slug}`]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // Calendario compartido + resultados vacíos + input, todo en pantalla.
+    expect(await screen.findByTestId('month-calendar')).toBeInTheDocument()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    expect(screen.getByTestId('result-empty')).toBeInTheDocument()
+    expect(screen.getByText(/Tu disponibilidad \(Ana\)/i)).toBeInTheDocument()
+
+    // Marcar hoy 09:00–10:00 en el input (columna del día controlado).
+    const today = todayISO()
+    await user.click(
+      screen.getByRole('button', {
+        name: `${formatShortDate(today)} 09:00–10:00 ocupado`,
+      }),
+    )
+    await user.click(
+      screen.getByRole('button', { name: /Guardar disponibilidad/ }),
+    )
+
+    // El día queda marcado en el calendario compartido…
+    expect(
+      await screen.findByRole('button', { name: /con disponibilidad/ }),
+    ).toBeInTheDocument()
+    // …y los resultados de la semana muestran la celda de hoy a la vez.
+    expect(await screen.findByTestId('result-grid')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: `${formatShortDate(today)} 09:00–10:00: 1 de 2 libres`,
+      }),
+    ).toBeInTheDocument()
+
+    // La semana elegida (la actual) se ve con sus 7 fechas tanto en el input
+    // como en los resultados (fechas, no nombres de día).
+    const weekStart = mondayOf(todayISO())
+    for (let i = 0; i < 7; i++) {
+      const label = formatShortDate(addDaysISO(weekStart, i))
+      expect(screen.getAllByText(label).length).toBeGreaterThanOrEqual(1)
+    }
   })
 })

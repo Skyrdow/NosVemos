@@ -5,9 +5,8 @@ import AvailabilityGrid from '../AvailabilityGrid'
 import type { Rule } from '../../lib/intersect'
 import { addDaysISO, formatFullDate, formatShortDate, mondayOf, todayISO } from '../../lib/utils'
 
-// Días siempre dentro de la ventana de 6 semanas que renderiza el calendario
-// (vista = mes del lunes de la semana de hoy): el lunes de esta semana y el
-// martes siguiente pertenecen a esa ventana por construcción.
+// Días siempre dentro de la ventana visible del calendario compartido (mes del
+// lunes de la semana de hoy): el lunes de esta semana y el martes siguiente.
 const firstInWindow = () => mondayOf(todayISO())
 const secondInWindow = () => addDaysISO(mondayOf(todayISO()), 1)
 
@@ -20,6 +19,7 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
       <AvailabilityGrid
         granularityMin={30}
         agendaType="weekly"
+        activeDate={todayISO()}
         initialRules={[]}
         onSave={onSave}
       />,
@@ -50,25 +50,23 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
   it('en modo Calendario elige un día puntual y produce una regla one_off', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn<(rules: Rule[]) => Promise<void>>(() => Promise.resolve())
+    const targetDate = firstInWindow()
 
     render(
       <AvailabilityGrid
         granularityMin={60}
         agendaType="one_off"
+        activeDate={targetDate}
         initialRules={[]}
         onSave={onSave}
       />,
     )
 
-    // Sin toggle: agenda one_off entra directo en Calendario.
+    // Sin toggle y sin calendario interno: el día llega controlado.
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
-    expect(screen.getByTestId('month-calendar')).toBeInTheDocument()
+    expect(screen.queryByTestId('month-calendar')).toBeNull()
 
-    // Elegir en el calendario un día de la ventana visible.
-    const targetDate = firstInWindow()
-    await user.click(screen.getByRole('button', { name: formatFullDate(targetDate) }))
-
-    // El título refleja el día a marcar.
+    // El título refleja el día controlado.
     expect(screen.getByTestId('av-day-title')).toHaveTextContent(
       formatFullDate(targetDate),
     )
@@ -93,28 +91,40 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
   it('en modo Calendario suma reglas one_off de fechas distintas', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn<(rules: Rule[]) => Promise<void>>(() => Promise.resolve())
+    const dayA = firstInWindow()
+    const dayB = secondInWindow()
 
-    render(
+    const { rerender } = render(
       <AvailabilityGrid
         granularityMin={60}
         agendaType="one_off"
+        activeDate={dayA}
         initialRules={[]}
         onSave={onSave}
       />,
     )
 
-    // Marcar 10:00–11:00 del primer día de la ventana.
-    const dayA = firstInWindow()
-    await user.click(screen.getByRole('button', { name: formatFullDate(dayA) }))
+    // Marcar 10:00–11:00 del primer día.
     await user.click(
       screen.getByRole('button', {
         name: `${formatShortDate(dayA)} 10:00–11:00 ocupado`,
       }),
     )
 
-    // Cambiar de día (al siguiente) y marcar otra franja: se acumula.
-    const dayB = secondInWindow()
-    await user.click(screen.getByRole('button', { name: formatFullDate(dayB) }))
+    // El mismo componente (misma key) cambia de día controlado: la selección
+    // del día anterior se conserva en el mapa y se suma la nueva.
+    rerender(
+      <AvailabilityGrid
+        granularityMin={60}
+        agendaType="one_off"
+        activeDate={dayB}
+        initialRules={[]}
+        onSave={onSave}
+      />,
+    )
+    expect(screen.getByTestId('av-day-title')).toHaveTextContent(
+      formatFullDate(dayB),
+    )
     await user.click(
       screen.getByRole('button', {
         name: `${formatShortDate(dayB)} 14:00–15:00 ocupado`,
@@ -132,11 +142,12 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
     ])
   })
 
-  it('inicia el modo Calendario en la primera fecha one_off ya guardada', () => {
+  it('inicia el modo Calendario en el día controlado con la franja cargada', () => {
     render(
       <AvailabilityGrid
         granularityMin={60}
         agendaType="one_off"
+        activeDate="2026-09-21"
         initialRules={[
           { kind: 'one_off', date: '2026-09-21', ranges: [[540, 600]] },
         ]}
@@ -147,10 +158,40 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
     expect(screen.getByTestId('av-day-title')).toHaveTextContent(
       formatFullDate('2026-09-21'),
     )
-    // La franja guardada llega seleccionada al día elegido.
+    // La franja guardada llega seleccionada al día controlado.
     expect(
       screen.getByRole('button', { name: '21/09 09:00–10:00 libre' }),
     ).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('modo Calendario muestra los 7 días de la semana con fechas', () => {
+    const weekStart = mondayOf(todayISO())
+    render(
+      <AvailabilityGrid
+        granularityMin={60}
+        agendaType="one_off"
+        activeDate={weekStart}
+        initialRules={[]}
+        onSave={vi.fn()}
+      />,
+    )
+
+    const headers = Array.from(
+      document.querySelectorAll('.av-grid .grid__day-header'),
+    ).map((el) => el.textContent)
+    expect(headers).toHaveLength(7)
+    expect(headers[0]).toBe(formatShortDate(weekStart))
+    expect(headers[6]).toBe(formatShortDate(addDaysISO(weekStart, 6)))
+    // Ninguna cabecera con nombre de día en modo Calendario.
+    for (const label of ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']) {
+      expect(headers).not.toContain(label)
+    }
+    // Las celdas de cualquier día de la semana están marcables por su fecha.
+    expect(
+      screen.getByRole('button', {
+        name: `${formatShortDate(addDaysISO(weekStart, 3))} 09:00–10:00 ocupado`,
+      }),
+    ).toBeInTheDocument()
   })
 
   it('carga reglas iniciales como seleccionadas', () => {
@@ -159,6 +200,7 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
       <AvailabilityGrid
         granularityMin={30}
         agendaType="weekly"
+        activeDate={todayISO()}
         initialRules={[{ kind: 'weekly', dayOfWeek: 2, ranges: [[540, 600]] }]}
         onSave={onSave}
       />,
@@ -175,6 +217,7 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
       <AvailabilityGrid
         granularityMin={30}
         agendaType="weekly"
+        activeDate={todayISO()}
         initialRules={[]}
         onSave={vi.fn()}
       />,
@@ -193,6 +236,7 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
       <AvailabilityGrid
         granularityMin={30}
         agendaType="hybrid"
+        activeDate={todayISO()}
         initialRules={[]}
         onSave={vi.fn()}
       />,
@@ -206,31 +250,6 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
     ).toBeInTheDocument()
   })
 
-  it('marca en el calendario los días puntuales ya guardados (filledDates)', () => {
-    const dayA = firstInWindow()
-    render(
-      <AvailabilityGrid
-        granularityMin={60}
-        agendaType="one_off"
-        initialRules={[{ kind: 'one_off', date: dayA, ranges: [[600, 660]] }]}
-        onSave={vi.fn()}
-      />,
-    )
-
-    const filledDay = screen.getByRole('button', {
-      name: `${formatFullDate(dayA)}, con disponibilidad`,
-    })
-    expect(filledDay).toHaveClass('month__day--filled')
-
-    // Un día sin disponibilidad guardada no lleva el indicador.
-    const emptyDay = secondInWindow()
-    expect(
-      screen.queryByRole('button', {
-        name: `${formatFullDate(emptyDay)}, con disponibilidad`,
-      }),
-    ).not.toBeInTheDocument()
-  })
-
   it('respeta el rango horario (solo display) manteniendo buckets absolutos', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn<(rules: Rule[]) => Promise<void>>(() => Promise.resolve())
@@ -239,6 +258,7 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
       <AvailabilityGrid
         granularityMin={30}
         agendaType="weekly"
+        activeDate={todayISO()}
         initialRules={[]}
         onSave={onSave}
         timeStartMin={600}

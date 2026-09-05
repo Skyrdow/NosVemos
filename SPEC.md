@@ -32,7 +32,7 @@ Formulario mínimo, de bajo fricción:
 ### 1.2 Unirse/participar — `/m/:slug`
 - Si el usuario no tiene un nombre guardado en la reunión, primero pide **nombre** y
   lo registra como participante. Si ese nombre **ya existe** en la reunión, se avisa
-  ("ese nombre ya está en uso; si no sos vos, probá con otro") pero **no se bloquea**:
+  ("ese nombre ya está en uso; si no eres tú, prueba con otro") pero **no se bloquea**:
   la persona continúa igual.
 - Muestra:
   a) la **grilla agregada** de disponibilidad de todos (si hay aportes),
@@ -43,21 +43,37 @@ Formulario mínimo, de bajo fricción:
 - **Opciones de la reunión** (popup abierto desde el botón "Opciones" del header,
   visible solo en el dispositivo que creó la reunión): se pueden editar
   granularidad, tipo de agenda (solo Semana/Calendario), rango horario y zona
-  horaria. Si cambian la granularidad o la agenda, guardar advierte que
+  horaria. El rango horario se ajusta con **dos sliders** "desde"/"hasta" (pasos
+  de 30 min, nunca inicio >= fin), cada uno con su valor en formato HH:MM. Si
+  cambian la granularidad o la agenda, guardar advierte que
   **borrará la disponibilidad guardada de todos los participantes**; un cambio
-  de solo zona horaria o rango no borra nada (confirmación genérica).
-- **Vista de resultados con dos modos**:
-  - **Semana**: grilla de bloques con header "Semana del X al Y". Muestra siempre
-    las columnas recurrentes Lun–Dom y solo los días puntuales dentro de esa semana.
-  - **Calendario**: mes navegable; elegir una semana vuelve a la vista Semana con esa
-    semana seleccionada. Los días con aportes aparecen marcados.
+  de solo zona horaria o rango no borra nada (confirmación genérica). Dentro del
+  popup se muestra una **vista previa** del calendario (lun–dom) que refleja
+  granularidad, rango y agenda: en modo "Semana" las columnas son los nombres de
+  día (Lun…Dom); en modo "Calendario" son las **7 fechas** de la semana actual
+  (DD/MM), igual que se verá el input al marcar.
+- **Vista de resultados** (el modo viene solo del tipo de agenda, sin toggle):
+  - **Semana** (`weekly` o `hybrid` legacy): grilla recurrente de la **semana
+    actual** (sin selector ni header) con las columnas Lun–Dom siempre visibles
+    y los días puntuales que caigan dentro de esa semana.
+  - **Calendario** (`one_off`): UN calendario compartido que elige día y semana;
+    debajo se ven los **resultados** de esa semana y, en la misma pantalla, el
+    **input** para marcar la disponibilidad del día activo (todo a la vez). Los
+    resultados muestran **siempre las 7 columnas de la semana elegida
+    etiquetadas con su fecha** (DD/MM, no nombres), aunque algún día no tenga
+    aportes; los días con aportes aparecen marcados en el calendario.
 - **Rango horario** (configuración de la reunión): lo define el anfitrión
   (default 08:00–20:00, pasos de 30 min). Aplica a la grilla de resultados y a la
   de input.
 
 ### 1.3 Vista de agenda por día
-- El input de disponibilidad se apoya en el modo **Calendario** (ver §2), donde se elige
-  un día puntual. La grilla de resultados colapsa/expande días puntuales.
+- En modo **Calendario** (`one_off`) el día activo del input lo controla el
+  calendario compartido de la sección de resultados (un solo calendario). El
+  input muestra **las 7 columnas de la semana que contiene el día activo**,
+  cada una etiquetada con su fecha (DD/MM); se puede marcar cualquier día de esa
+  semana y la selección de días distintos (incluso de semanas diferentes) se
+  acumula y se persiste toda junto al guardar. La grilla de resultados
+  colapsa/expande días puntuales.
 
 ---
 
@@ -84,9 +100,12 @@ ranges: array de [startMin, endMin] en minutos desde medianoche (0..1440, start<
   clic/arrastre las horas libres.
   - **Semana** (`weekly`, o `hybrid` legacy): se marcan las franjas de la semana;
     cada regla es `weekly`.
-  - **Calendario** (`one_off`): calendario + un día a la vez para marcar franjas;
-    cada regla es `one_off` con la fecha elegida. Los días con disponibilidad ya
-    guardada aparecen marcados en el calendario.
+  - **Calendario** (`one_off`): el día activo lo **controla el calendario
+    compartido** de la sección de resultados; la grilla muestra **las 7 columnas
+    de la semana que contiene ese día**, cada una etiquetada con su **fecha**
+    (DD/MM, no el nombre del día). Las franjas de días distintos se acumulan en
+    la selección (cada regla es `one_off` con la fecha de su día). Al guardar se
+    persisten todos los días marcados.
 
 ---
 
@@ -238,9 +257,10 @@ create policy "anon delete slots"    on public.slots        for delete using (tr
 - CSS plano o CSS Modules (mantener dependencias al mínimo; sin UI kit ni Tailwind).
 - Grilla semanal responsive; clic/arrastre para marcar franjas; accesible (labels,
   teclado donde sea razonable).
-- Rango horario configurable por el anfitrión (default 08:00–20:00), aplicado a
-  grillas de entrada y resultados; vista Calendario para elegir la semana de la
-  vista de resultados.
+- Rango horario configurable por el anfitrión (default 08:00–20:00) con sliders
+  "desde"/"hasta", aplicado a grillas de entrada y resultados; en modo `one_off`
+  un solo calendario compartido elige el día y la semana (resultados y edición
+  a la vez).
 - Estilo de colores de celdas: verde `allFree`, amarillo parcial, gris ninguno;
   tooltip/detalle con la lista de quiénes están libres al hacer clic.
 - Intercambio de datos con Supabase solo vía el data layer (nunca fetch directo).

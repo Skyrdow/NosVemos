@@ -35,9 +35,9 @@ npm run build  # typecheck + build de producción
 
 ## Integración con Supabase (paso a paso)
 
-1. Creá un proyecto en [Supabase](https://supabase.com) (Plan Free alcanza).
-2. En **SQL Editor** → New query, pegá el contenido de `supabase/schema.sql` y
-   ejecutalo. Crea las tablas `meetings`, `participants`, `slots`, índices y las
+1. Crea un proyecto en [Supabase](https://supabase.com) (Plan Free alcanza).
+2. En **SQL Editor** → New query, pega el contenido de `supabase/schema.sql` y
+   ejecútalo. Crea las tablas `meetings`, `participants`, `slots`, índices y las
    políticas RLS anónimas (MVP de link compartido). `meetings` incluye el rango
    horario de la reunión (`time_start_min`/`time_end_min`, default 08:00–20:00)
    y políticas `select`/`insert`/`update` (el creador puede ajustar las
@@ -45,10 +45,10 @@ npm run build  # typecheck + build de producción
    necesario porque `saveSlots` reemplaza las reglas borrando las anteriores
    antes de insertar, y el "borrar disponibilidad de todos" (al cambiar
    opciones) hace un delete masivo.
-3. En **Project Settings → API**, copiá:
+3. En **Project Settings → API**, copia:
    - `Project URL` → `VITE_SUPABASE_URL`
    - `anon public` key → `VITE_SUPABASE_ANON_KEY` (clave **publishable**, segura en el cliente)
-4. Editá `.env.local`:
+4. Edita `.env.local`:
 
    ```dotenv
    VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
@@ -95,10 +95,10 @@ src/
     JoinMeeting.tsx       # /m/:slug  unirse/participar
   components/
     MeetingOptions.tsx    # popup de opciones de la reunión (solo anfitrión)
-    CalendarPreview.tsx   # mini grilla estática (opciones del creador)
-    MonthCalendar.tsx     # calendario mensual (semanas + mes por popup)
-    AvailabilityGrid.tsx  # input de disponibilidad (clic/arrastre)
-    ResultGrid.tsx        # grilla agregada con colores y detalle
+    CalendarPreview.tsx   # mini grilla estática (opciones): nombres o fechas según agenda
+    MonthCalendar.tsx     # calendario mensual compartido (elegir semana/día)
+    AvailabilityGrid.tsx  # input de disponibilidad (clic/arrastre; semana con fechas en modo calendario)
+    ResultGrid.tsx        # grilla agregada con colores y detalle (7 columnas forzadas por semana/día)
     NamePrompt.tsx        # pedido de nombre al participar
     __tests__/            # tests de componentes
   App.tsx                 # rutas de la SPA
@@ -110,7 +110,7 @@ vercel.json               # build + rewrites SPA (/m/:slug → index.html)
 ## Despliegue en Vercel
 
 `vercel.json` ya configura todo: `npm run build` → `dist`, con rewrite SPA para
-`/m/:slug`. En Vercel agregá las mismas variables de entorno de `.env.local`.
+`/m/:slug`. En Vercel agrega las mismas variables de entorno de `.env.local`.
 
 ## Spec
 
