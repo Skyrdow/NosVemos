@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import App from '../../App'
 import { dataLayer } from '../../lib/data'
-import { rememberParticipant } from '../../lib/utils'
+import { rememberCreator, rememberParticipant } from '../../lib/utils'
 
 async function createMeetingFixture() {
   const meeting = await dataLayer.createMeeting({
@@ -12,7 +12,8 @@ async function createMeetingFixture() {
     title: 'Retro quincenal',
     timezone: 'UTC',
     granularityMin: 30,
-    durationHintMin: 60,
+    timeStartMin: 480,
+    timeEndMin: 1200,
     agendaType: 'hybrid',
     creatorName: 'Ana',
   })
@@ -117,5 +118,174 @@ describe('flujo unirse a una reunión', () => {
     // Y los "huecos donde todos pueden" se resumen arriba
     expect(screen.getByTestId('allfree-ranges')).toBeInTheDocument()
     expect(screen.getByText(/Todos libres/i)).toBeInTheDocument()
+  })
+
+  it('avisa si el nombre ya está en uso pero no bloquea la participación', async () => {
+    const user = userEvent.setup()
+    const meeting = await createMeetingFixture()
+    sessionStorage.clear()
+
+    render(
+      <MemoryRouter initialEntries={[`/m/${meeting.slug}`]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // Ana ya está registrada en la reunión; otro dispositivo entra con "Ana".
+    await user.type(await screen.findByLabelText('Nombre'), 'Ana')
+    await user.click(screen.getByRole('button', { name: 'Participar' }))
+
+    // El aviso aparece…
+    expect(
+      await screen.findByText(/ya está en uso en esta reunión/i),
+    ).toBeInTheDocument()
+    // …pero la participación no se bloquea: la grilla se muestra igual.
+    expect(screen.getByText(/Tu disponibilidad \(Ana\)/i)).toBeInTheDocument()
+
+    // El aviso se puede descartar.
+    await user.click(screen.getByRole('button', { name: 'Entendido' }))
+    expect(
+      screen.queryByText(/ya está en uso en esta reunión/i),
+    ).not.toBeInTheDocument()
+  })
+
+  it('quien no es anfitrión no ve el botón de Opciones', async () => {
+    const meeting = await createMeetingFixture()
+    sessionStorage.clear()
+
+    render(
+      <MemoryRouter initialEntries={[`/m/${meeting.slug}`]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // Sin registro de creador en este dispositivo no aparece el botón.
+    expect(await screen.findByText(/Sumate a/)).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Opciones/ }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByTestId('options-popup')).not.toBeInTheDocument()
+  })
+
+  it('el anfitrión abre el popup de opciones y al confirmar borra la disponibilidad', async () => {
+    const user = userEvent.setup()
+    const meeting = await createMeetingFixture()
+    const participants = await dataLayer.getParticipants(meeting.id)
+    const ana = participants.find((p) => p.name === 'Ana')!
+    const ben = participants.find((p) => p.name === 'Ben')!
+
+    // Ana y Ben ya aportaron el lunes 09:00-10:00.
+    await dataLayer.saveSlots(ana.id, [
+      { kind: 'weekly', dayOfWeek: 0, date: null, ranges: [[540, 600]] },
+    ])
+    await dataLayer.saveSlots(ben.id, [
+      { kind: 'weekly', dayOfWeek: 0, date: null, ranges: [[540, 600]] },
+    ])
+
+    sessionStorage.clear()
+    rememberParticipant(meeting.id, ana.id)
+    rememberCreator(meeting.id)
+
+    render(
+      <MemoryRouter initialEntries={[`/m/${meeting.slug}`]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // El botón existe solo en el dispositivo del creador; abre el popup.
+    const optionsButton = await screen.findByRole('button', { name: /Opciones/ })
+    expect(optionsButton).toHaveAttribute('aria-expanded', 'false')
+    await user.click(optionsButton)
+    expect(optionsButton).toHaveAttribute('aria-expanded', 'true')
+    expect(
+      screen.getByRole('dialog', { name: 'Opciones de la reunión' }),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('options-popup')).toBeInTheDocument()
+    expect(
+      await screen.findByText(/Tu disponibilidad \(Ana\)/i),
+    ).toBeInTheDocument()
+
+    // Cambiar un valor habilita "Guardar cambios".
+    await user.selectOptions(
+      screen.getByLabelText('Granularidad de la grilla'),
+      '60',
+    )
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    // Aviso inline de borrado antes de aplicar.
+    expect(
+      screen.getByText(
+        /Esto borrará la disponibilidad guardada de todos los participantes/i,
+      ),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    // La reunión quedó con la nueva granularidad…
+    await waitFor(async () => {
+      const reloaded = await dataLayer.getMeetingBySlug(meeting.slug)
+      expect(reloaded!.granularityMin).toBe(60)
+    })
+
+    // …y los slots de TODOS los participantes quedaron borrados.
+    await waitFor(async () => {
+      expect(await dataLayer.getSlots(ana.id)).toHaveLength(0)
+    })
+    expect(await dataLayer.getSlots(ben.id)).toHaveLength(0)
+
+    // El popup se cierra tras guardar; sin aportes la grilla muestra vacío.
+    await waitFor(() => {
+      expect(screen.queryByTestId('options-popup')).not.toBeInTheDocument()
+    })
+    expect(await screen.findByTestId('result-empty')).toBeInTheDocument()
+  })
+
+  it('cambiar solo la zona horaria no borra la disponibilidad guardada', async () => {
+    const user = userEvent.setup()
+    const meeting = await createMeetingFixture()
+    const participants = await dataLayer.getParticipants(meeting.id)
+    const ana = participants.find((p) => p.name === 'Ana')!
+    const ben = participants.find((p) => p.name === 'Ben')!
+
+    await dataLayer.saveSlots(ana.id, [
+      { kind: 'weekly', dayOfWeek: 0, date: null, ranges: [[540, 600]] },
+    ])
+    await dataLayer.saveSlots(ben.id, [
+      { kind: 'weekly', dayOfWeek: 0, date: null, ranges: [[540, 600]] },
+    ])
+
+    sessionStorage.clear()
+    rememberParticipant(meeting.id, ana.id)
+    rememberCreator(meeting.id)
+
+    render(
+      <MemoryRouter initialEntries={[`/m/${meeting.slug}`]}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /Opciones/ }))
+    await user.selectOptions(
+      screen.getByLabelText('Zona horaria'),
+      'America/Buenos_Aires',
+    )
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    // Solo zona/rango → confirmación genérica (no avisa borrado).
+    expect(
+      screen.getByText(/¿Guardar los cambios de la reunión\?/),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    // La zona cambió…
+    await waitFor(async () => {
+      const reloaded = await dataLayer.getMeetingBySlug(meeting.slug)
+      expect(reloaded!.timezone).toBe('America/Buenos_Aires')
+    })
+
+    // …pero la disponibilidad sigue intacta.
+    await waitFor(async () => {
+      expect(await dataLayer.getSlots(ana.id)).toHaveLength(1)
+      expect(await dataLayer.getSlots(ben.id)).toHaveLength(1)
+    })
   })
 })

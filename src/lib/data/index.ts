@@ -11,7 +11,7 @@ import { createSupabaseDataLayer } from './supabaseDataLayer'
 
 export type { DataLayer } from './types'
 export type { Meeting, NewMeeting, Participant, NewParticipant, Slot, NewSlot, Unsubscribe } from './types'
-export type { AgendaType } from './types'
+export type { AgendaType, MeetingPatch } from './types'
 export { MemoryDataLayer } from './memoryDataLayer'
 export { SupabaseDataLayer } from './supabaseDataLayer'
 

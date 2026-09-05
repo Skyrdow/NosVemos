@@ -241,12 +241,48 @@ select:focus-visible {
   gap: 10px;
 }
 
+.join__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .join__share code {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 4px 10px;
   font-size: 14px;
+}
+
+/* ===== Popup de opciones de la reunión (solo anfitrión) ===== */
+
+.join__modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.join__options {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  max-width: 560px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.join__options-title {
+  margin: 0 0 10px;
+  color: var(--heading);
 }
 
 .join__section {
@@ -282,6 +318,402 @@ select:focus-visible {
   color: var(--ok);
   font-weight: 600;
   font-size: 14px;
+}
+
+.join__warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--cell-partial-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.join__warning p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.join__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.join__views {
+  display: flex;
+  gap: 6px;
+}
+
+.join__views button {
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.join__views button.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.join__week-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.join__week-header strong {
+  color: var(--heading);
+}
+
+/* ===== Calendario mensual (elegir semana) ===== */
+
+.month {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  max-width: 720px;
+}
+
+.month__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.month__label {
+  font: inherit;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--heading);
+  text-transform: capitalize;
+  padding: 4px 10px;
+  border-radius: 8px;
+  transition: background-color 0.15s;
+}
+
+.month__label:hover {
+  background: var(--cell-partial-bg);
+}
+
+.month__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Cabeceras de días y filas-semana comparten la MISMA grilla: una columna
+   inicial del ancho del botón de semana (esquina en blanco) y 7 columnas para
+   los días, de modo que cada cabecera quede exactamente sobre su columna. */
+.month__dow {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.month__dow-corner {
+  /* Esquina vacía: alinea las cabeceras con la columna del botón de semana. */
+}
+
+.month__dow-days,
+.month__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.month__dow-cell {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Cada fila-semana es un contenedor propio: botón de semana a la izquierda
+   (a toda la altura) y los 7 días a la derecha. */
+.month__week {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  align-items: stretch;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: var(--surface);
+}
+
+.month__week--current {
+  border-color: var(--accent);
+  background: var(--cell-free-bg);
+}
+
+.month__week-btn {
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.month__week-btn:hover {
+  border-color: var(--accent);
+}
+
+.month__week-btn[aria-current='date'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.month__day {
+  font: inherit;
+  text-align: center;
+  font-size: 13px;
+  padding: 6px 0;
+  border-radius: 8px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  position: relative;
+}
+
+button.month__day {
+  cursor: pointer;
+}
+
+button.month__day:hover {
+  background: var(--cell-partial-bg);
+}
+
+.month__day--muted {
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+.month__day--selected,
+button.month__day--selected:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  opacity: 1;
+}
+
+/* Fechas con disponibilidad ya guardada: punto indicador bajo el número,
+   distinto del resaltado del día seleccionado. */
+.month__day--filled::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.month__day--selected.month__day--filled::after {
+  background: #fff;
+}
+
+/* ===== Popup para elegir mes (etiqueta del calendario) ===== */
+
+.month__picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+
+.month__picker {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  min-width: 260px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.month__picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.month__picker-head strong {
+  color: var(--heading);
+  font-size: 16px;
+}
+
+.month__picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.month__picker-month {
+  font: inherit;
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.month__picker-month:hover {
+  border-color: var(--accent);
+}
+
+.month__picker-month--current {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ===== Panel de opciones de la reunión (creador) ===== */
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.options__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.options__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--cell-partial-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.options__confirm p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.options__confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.options__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.options__hint {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--cell-partial-bg);
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* ===== Vista previa del calendario (panel de opciones del creador) ===== */
+
+.cal-preview {
+  pointer-events: none;
+  user-select: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.cal-preview__caption {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.grid--preview {
+  min-width: 0;
+}
+
+.grid--preview .grid__day-header {
+  min-height: 20px;
+  padding: 2px;
+  font-size: 10px;
+}
+
+.grid--preview .grid__time {
+  font-size: 10px;
+  padding: 1px 6px 1px 2px;
+}
+
+.grid--preview .grid__cell {
+  min-height: 12px;
+  cursor: default;
+}
+
+.result__holes-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 /* ===== Grilla base (reutilizada por input y resultados) ===== */
@@ -410,66 +842,22 @@ select:focus-visible {
   padding: 16px;
 }
 
-.av-grid__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.av-grid__modes {
-  display: flex;
-  gap: 6px;
-}
-
-.av-grid__modes button {
-  font-size: 13px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.av-grid__modes button.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.av-grid__date {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.av-grid__date label {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.av-grid__date input {
-  font: inherit;
-  font-size: 13px;
-  padding: 5px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border-strong);
-  background: var(--input-bg);
-  color: var(--text);
-}
-
-.av-grid__date button {
-  font-size: 13px;
-  padding: 5px 12px;
-}
-
 .av-grid__canvas {
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 10px;
+}
+
+.av-grid__calendar {
+  max-width: 720px;
+}
+
+.av-grid__day-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--heading);
+  text-transform: capitalize;
 }
 
 .av-grid__hint {
@@ -633,10 +1021,5 @@ select:focus-visible {
   .create__form,
   .name-prompt {
     padding: 18px;
-  }
-
-  .av-grid__toolbar {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }

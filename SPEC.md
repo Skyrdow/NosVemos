@@ -16,30 +16,48 @@ App web para que un grupo de personas organice una reunión en un horario.
 ## 1. Páginas / flujo
 
 ### 1.1 Crear reunión — `/`
-Formulario:
+Formulario mínimo, de bajo fricción:
 - Título de la reunión.
-- Granularidad de la grilla: 15 / 30 / 60 min (default 30).
-- Duración mínima sugerida (min).
-- Tipo de agenda de la reunión: `weekly` | `one_off` | `hybrid` (si `hybrid`, cada
-  participante elige cómo aportar; si `weekly`, solo recurrente; si `one_off`, solo fechas).
-- Zona horaria (default la del navegador).
-- Al crear → genera el slug (5-6 chars, sin mayúsculas/ambigüos, ej. `-` `0O1lI` fuera)
-  y redirige a `/m/<slug>`. El creador es automáticamente el primer participante y
-  también aporta disponibilidad.
+- Tu nombre (serás el primer participante).
+- Zona horaria (**select con opciones preestablecidas**; por defecto la del navegador,
+  agregando "(tu zona)" si no está en la lista).
+- El resto de opciones se configuran luego desde la vista de la reunión (creador).
+  Defaults al crear: granularidad **60 min** (bloques de 1 hora), agenda `hybrid`
+  (compatibilidad; el input funciona como semana recurrente) y rango horario
+  `time_start_min = 480` / `time_end_min = 1200` (08:00–20:00). No existe
+  duración mínima.
+- Al crear → genera el slug (5-6 chars, sin mayúsculas/ambigüos, ej. `-` `0O1lI` fuera),
+  marca este dispositivo como **creador** (sessionStorage) y redirige a `/m/<slug>`.
 
 ### 1.2 Unirse/participar — `/m/:slug`
 - Si el usuario no tiene un nombre guardado en la reunión, primero pide **nombre** y
-  lo registra como participante.
+  lo registra como participante. Si ese nombre **ya existe** en la reunión, se avisa
+  ("ese nombre ya está en uso; si no sos vos, probá con otro") pero **no se bloquea**:
+  la persona continúa igual.
 - Muestra:
   a) la **grilla agregada** de disponibilidad de todos (si hay aportes),
   b) los **huecos donde todos están libres** (allFree),
   c) el **input** para que este participante marque sus franjas.
 - Las ediciones de otros se reflejan en vivo (Supabase Realtime) y la grilla se
   recalcula al vuelo.
+- **Opciones de la reunión** (popup abierto desde el botón "Opciones" del header,
+  visible solo en el dispositivo que creó la reunión): se pueden editar
+  granularidad, tipo de agenda (solo Semana/Calendario), rango horario y zona
+  horaria. Si cambian la granularidad o la agenda, guardar advierte que
+  **borrará la disponibilidad guardada de todos los participantes**; un cambio
+  de solo zona horaria o rango no borra nada (confirmación genérica).
+- **Vista de resultados con dos modos**:
+  - **Semana**: grilla de bloques con header "Semana del X al Y". Muestra siempre
+    las columnas recurrentes Lun–Dom y solo los días puntuales dentro de esa semana.
+  - **Calendario**: mes navegable; elegir una semana vuelve a la vista Semana con esa
+    semana seleccionada. Los días con aportes aparecen marcados.
+- **Rango horario** (configuración de la reunión): lo define el anfitrión
+  (default 08:00–20:00, pasos de 30 min). Aplica a la grilla de resultados y a la
+  de input.
 
 ### 1.3 Vista de agenda por día
-- Adicional a la semana recurrente, se puede elegir **día concreto** (mes/día) y marcar
-  franjas para ese día puntual. La grilla de resultados colapsa/expande días puntuales.
+- El input de disponibilidad se apoya en el modo **Calendario** (ver §2), donde se elige
+  un día puntual. La grilla de resultados colapsa/expande días puntuales.
 
 ---
 
@@ -61,9 +79,14 @@ ranges: array de [startMin, endMin] en minutos desde medianoche (0..1440, start<
   (`[9,12]` + `[11,14]` → `[9,14]`). Es responsabilidad del motor, no del UI.
 - **Validación**: start<end, dentro de 0..1440, `day_of_week` en 0..6, `date` válida.
   Los rangos inválidos se rechazan antes de persistir.
-- **Interacción en el UI**: grilla semana (7 días × franjas según granularidad) donde
-  el usuario marca con clic/arrastre las horas libres. Un input adicional permite
-  alternar "recurrente semanal" ↔ "día puntual" (fecha) según el `agenda_type`.
+- **Interacción en el UI (un solo modo según `agenda_type`, sin toggles)**:
+  grilla (7 días × franjas según granularidad) donde el usuario marca con
+  clic/arrastre las horas libres.
+  - **Semana** (`weekly`, o `hybrid` legacy): se marcan las franjas de la semana;
+    cada regla es `weekly`.
+  - **Calendario** (`one_off`): calendario + un día a la vez para marcar franjas;
+    cada regla es `one_off` con la fecha elegida. Los días con disponibilidad ya
+    guardada aparecen marcados en el calendario.
 
 ---
 
@@ -132,8 +155,9 @@ create table public.meetings (
   slug text not null unique,
   title text not null,
   timezone text not null default 'UTC',
-  granularity_min int not null default 30,
-  duration_hint_min int,
+  granularity_min int not null default 60,
+  time_start_min int not null default 480,   -- rango horario visible (08:00)
+  time_end_min int not null default 1200,    -- rango horario visible (20:00)
   agenda_type text not null default 'hybrid'
     check (agenda_type in ('weekly','one_off','hybrid')),
   creator_name text,
@@ -168,14 +192,21 @@ alter table public.slots        enable row level security;
 
 create policy "anon leer reunión"    on public.meetings     for select using (true);
 create policy "anon crear reunión"   on public.meetings     for insert with check (true);
+create policy "anon update reunión"  on public.meetings     for update using (true) with check (true);
 create policy "anon leer participantes" on public.participants for select using (true);
 create policy "anon insert participantes" on public.participants for insert with check (true);
 create policy "anon leer slots"      on public.slots        for select using (true);
 create policy "anon insert slots"    on public.slots        for insert with check (true);
+create policy "anon delete slots"    on public.slots        for delete using (true);
 ```
 
 - Slug único conflictivo → reintentar con otro slug.
-- `meetings`/`slots` se escuchan con **Realtime** para actualizar la grilla en vivo.
+- Slot único conflictivo ya no aplica (MVP anónimo).
+- `slots` usa delete+reinsert para reemplazar las reglas de un participante, y el
+  creador borra todos los slots de la reunión al cambiar las opciones: por eso existe
+  la política de `delete`.
+- `meetings`, `participants` y `slots` se escuchan con **Realtime** para actualizar
+  la grilla en vivo (incluye cambios de opciones hechos por el creador).
 
 ### Cliente y data layer
 - `src/lib/supabase.ts` crea el cliente con
@@ -185,6 +216,9 @@ create policy "anon insert slots"    on public.slots        for insert with chec
   - `memoryDataLayer.ts` — implementación en memoria con la MISMA interfaz, para
     desarrollo, preview y **tests sin credenciales**.
   - `index.ts` exporta la capa activa según `VITE_USE_LOCAL=true` o presencia de env vars.
+- Operaciones de la interfaz: crear/leer reunión, `updateMeeting` (opciones editadas
+  por el creador), registrar/leer participantes, leer/reemplazar slots y
+  `clearMeetingSlots` (borra TODOS los slots de una reunión).
 - La app DEBE funcionar completa en modo local (memory) para que los tests corran sin
   secretos. La integración con Supabase real se documenta en el README (paso a paso).
 - **Nunca** commitear credenciales. `.env.example` con placeholders:
@@ -204,6 +238,9 @@ create policy "anon insert slots"    on public.slots        for insert with chec
 - CSS plano o CSS Modules (mantener dependencias al mínimo; sin UI kit ni Tailwind).
 - Grilla semanal responsive; clic/arrastre para marcar franjas; accesible (labels,
   teclado donde sea razonable).
+- Rango horario configurable por el anfitrión (default 08:00–20:00), aplicado a
+  grillas de entrada y resultados; vista Calendario para elegir la semana de la
+  vista de resultados.
 - Estilo de colores de celdas: verde `allFree`, amarillo parcial, gris ninguno;
   tooltip/detalle con la lista de quiénes están libres al hacer clic.
 - Intercambio de datos con Supabase solo vía el data layer (nunca fetch directo).
@@ -215,7 +252,9 @@ create policy "anon insert slots"    on public.slots        for insert with chec
 - `npm run build` (typecheck + build prod) ✓
 - `npm run lint` ✓
 - `npm test` ✓ (motor de intersección 100% cubierto de casos + component tests:
-  crear reunión, unirse con nombre, marcar franja, grilla con recuento, highlight allFree)
+  crear reunión, unirse con nombre, marcar franja, grilla con recuento, highlight
+  allFree, calendario de semanas, opciones del creador en popup con borrado
+  avisado/condicionado, rango horario y nombre duplicado con aviso no bloqueante)
 
 ---
 

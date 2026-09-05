@@ -11,7 +11,9 @@ export interface Meeting {
   title: string
   timezone: string
   granularityMin: number
-  durationHintMin: number | null
+  /** Rango horario visible de las grillas (minutos desde medianoche). */
+  timeStartMin: number
+  timeEndMin: number
   agendaType: AgendaType
   creatorName: string | null
   createdAt: string
@@ -22,7 +24,8 @@ export interface NewMeeting {
   title: string
   timezone: string
   granularityMin: number
-  durationHintMin: number | null
+  timeStartMin: number
+  timeEndMin: number
   agendaType: AgendaType
   creatorName: string | null
 }
@@ -59,6 +62,14 @@ export interface NewSlot {
 
 export type Unsubscribe = () => void
 
+/** Campos editables de una reunión existente (parcial). */
+export type MeetingPatch = Partial<
+  Pick<
+    Meeting,
+    'title' | 'timezone' | 'granularityMin' | 'timeStartMin' | 'timeEndMin' | 'agendaType'
+  >
+>
+
 export interface DataLayer {
   createMeeting(meeting: NewMeeting): Promise<Meeting>
   getMeetingBySlug(slug: string): Promise<Meeting | null>
@@ -68,6 +79,10 @@ export interface DataLayer {
   getSlots(participantId: string): Promise<Slot[]>
   /** Sustituye TODAS las reglas del participante por `slots`. */
   saveSlots(participantId: string, slots: NewSlot[]): Promise<Slot[]>
+  /** Edita campos de la reunión y devuelve la reunión actualizada. */
+  updateMeeting(id: string, patch: MeetingPatch): Promise<Meeting>
+  /** Borra la disponibilidad guardada de TODOS los participantes de la reunión. */
+  clearMeetingSlots(meetingId: string): Promise<void>
   /** Suscripción a cambios (participants/slots) de una reunión. Devuelve unsubscribe. */
   subscribeToMeeting(meetingId: string, onChange: () => void): Unsubscribe
 }

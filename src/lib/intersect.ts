@@ -35,7 +35,7 @@ export interface AllFreeRange {
   endMin: number
 }
 
-export const ALLOWED_GRANULARITIES = [15, 30, 60] as const
+export const ALLOWED_GRANULARITIES = [15, 30, 60, 90, 120] as const
 export type Granularity = (typeof ALLOWED_GRANULARITIES)[number]
 
 export const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const
@@ -90,7 +90,7 @@ export function mergeRanges(ranges: [number, number][]): [number, number][] {
 }
 
 function isGranularitySupported(granularityMin: number): boolean {
-  return granularityMin > 0 && 1440 % granularityMin === 0 && granularityMin <= 60
+  return granularityMin > 0 && 1440 % granularityMin === 0 && granularityMin <= 120
 }
 
 function assertValidInput(
@@ -99,7 +99,7 @@ function assertValidInput(
 ): void {
   if (!Number.isFinite(granularityMin) || !isGranularitySupported(granularityMin)) {
     throw new Error(
-      `Granularidad inválida: ${granularityMin}. Debe ser un divisor de 1440 entre 1 y 60.`,
+      `Granularidad inválida: ${granularityMin}. Debe ser un divisor de 1440 entre 1 y 120.`,
     )
   }
   for (const slot of slots) {

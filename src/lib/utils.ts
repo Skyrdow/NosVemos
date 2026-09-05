@@ -36,6 +36,9 @@ export function formatFullDate(date: string): string {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    // La fecha se construyó en UTC: sin esta opción la zona local (p. ej. UTC-3)
+    // correría el día y mostraría la fecha anterior.
+    timeZone: 'UTC',
   })
 }
 
@@ -98,4 +101,103 @@ export function browserTimezone(): string {
   } catch {
     return 'UTC'
   }
+}
+
+/** Preajustes de zona horaria ofrecidos en los selects de la app. */
+export const TIMEZONE_PRESETS = [
+  'UTC',
+  'America/Buenos_Aires',
+  'America/Santiago',
+  'America/Sao_Paulo',
+  'America/Bogota',
+  'America/Mexico_City',
+  'America/New_York',
+  'America/Chicago',
+  'America/Los_Angeles',
+  'Europe/Madrid',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Rome',
+  'Europe/Lisbon',
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Asia/Kolkata',
+] as const
+
+/**
+ * Opciones del select de zona horaria.
+ * Si la zona del navegador no está en los preajustes, se agrega primero
+ * etiquetada como "(tu zona)" para que siempre haya una opción válida.
+ */
+export function getTimezoneOptions(): { value: string; label: string }[] {
+  const browser = browserTimezone()
+  const options: { value: string; label: string }[] = []
+  if (!TIMEZONE_PRESETS.includes(browser as (typeof TIMEZONE_PRESETS)[number])) {
+    options.push({ value: browser, label: `${browser} (tu zona)` })
+  }
+  for (const tz of TIMEZONE_PRESETS) {
+    options.push({ value: tz, label: tz })
+  }
+  return options
+}
+
+const CREATOR_KEY = 'nosvemos:creator'
+
+/** Marca el dispositivo actual como creador de una reunión (sessionStorage). */
+export function rememberCreator(meetingId: string): void {
+  try {
+    const raw = sessionStorage.getItem(CREATOR_KEY)
+    const list = raw ? (JSON.parse(raw) as string[]) : []
+    if (!list.includes(meetingId)) list.push(meetingId)
+    sessionStorage.setItem(CREATOR_KEY, JSON.stringify(list))
+  } catch {
+    // sessionStorage puede no estar disponible (SSR/webviews) → ignorar
+  }
+}
+
+/** True si este dispositivo creó la reunión indicada. */
+export function isCreatorOf(meetingId: string): boolean {
+  try {
+    const raw = sessionStorage.getItem(CREATOR_KEY)
+    if (!raw) return false
+    const list = JSON.parse(raw) as string[]
+    return list.includes(meetingId)
+  } catch {
+    return false
+  }
+}
+
+function parseISODate(dateISO: string): Date {
+  const [y, m, d] = dateISO.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d))
+}
+
+function toUTCISO(date: Date): string {
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(date.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/** Lunes (en formato YYYY-MM-DD) de la semana que contiene `dateISO`. */
+export function mondayOf(dateISO: string): string {
+  const date = parseISODate(dateISO)
+  const dow = (date.getUTCDay() + 6) % 7 // 0 = lunes
+  return toUTCISO(
+    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - dow)),
+  )
+}
+
+/** Suma días (puede ser negativo) a una fecha YYYY-MM-DD. */
+export function addDaysISO(dateISO: string, days: number): string {
+  const date = parseISODate(dateISO)
+  return toUTCISO(
+    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days)),
+  )
+}
+
+/** True si `dateISO` está entre startISO y endISO (inclusive). */
+export function dateInRange(dateISO: string, startISO: string, endISO: string): boolean {
+  return dateISO >= startISO && dateISO <= endISO
 }

@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { dataLayer } from '../lib/data'
-import type { AgendaType } from '../lib/data/types'
-import { generateSlug, normalizeName, rememberParticipant, browserTimezone } from '../lib/utils'
-
-const GRANULARITIES = [15, 30, 60] as const
+import {
+  browserTimezone,
+  generateSlug,
+  getTimezoneOptions,
+  normalizeName,
+  rememberCreator,
+  rememberParticipant,
+} from '../lib/utils'
 
 export default function CreateMeeting() {
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
-  const [granularityMin, setGranularityMin] = useState(30)
-  const [durationHintMin, setDurationHintMin] = useState('60')
-  const [agendaType, setAgendaType] = useState<AgendaType>('hybrid')
   const [timezone, setTimezone] = useState(browserTimezone)
   const [creatorName, setCreatorName] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -39,10 +40,14 @@ export default function CreateMeeting() {
         const meeting = await dataLayer.createMeeting({
           slug,
           title: normalizeName(title),
-          timezone: timezone.trim() || 'UTC',
-          granularityMin,
-          durationHintMin: Number(durationHintMin) > 0 ? Number(durationHintMin) : null,
-          agendaType,
+          timezone: timezone || 'UTC',
+          // Valores por defecto del MVP: granularidad de una hora, agenda
+          // "hybrid" (compatibilidad: se comporta como semana recurrente) y
+          // rango horario 08:00–20:00 (configurable luego desde la reunión).
+          granularityMin: 60,
+          timeStartMin: 480,
+          timeEndMin: 1200,
+          agendaType: 'hybrid',
           creatorName: name,
         })
         const participant = await dataLayer.registerParticipant({
@@ -50,6 +55,7 @@ export default function CreateMeeting() {
           name,
         })
         rememberParticipant(meeting.id, participant.id)
+        rememberCreator(meeting.id)
         navigate(`/m/${meeting.slug}`)
         return
       }
@@ -88,57 +94,6 @@ export default function CreateMeeting() {
         </div>
 
         <div className="field">
-          <label htmlFor="meeting-granularity">Granularidad de la grilla</label>
-          <select
-            id="meeting-granularity"
-            value={granularityMin}
-            onChange={(e) => setGranularityMin(Number(e.target.value))}
-          >
-            {GRANULARITIES.map((g) => (
-              <option key={g} value={g}>
-                {g} minutos
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <label htmlFor="meeting-duration">Duración mínima sugerida (min)</label>
-          <input
-            id="meeting-duration"
-            type="number"
-            min={15}
-            step={5}
-            value={durationHintMin}
-            onChange={(e) => setDurationHintMin(e.target.value)}
-            inputMode="numeric"
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="meeting-agenda">Tipo de agenda</label>
-          <select
-            id="meeting-agenda"
-            value={agendaType}
-            onChange={(e) => setAgendaType(e.target.value as AgendaType)}
-          >
-            <option value="weekly">Semana recurrente</option>
-            <option value="one_off">Día puntual</option>
-            <option value="hybrid">Híbrido (semana o día puntual)</option>
-          </select>
-        </div>
-
-        <div className="field">
-          <label htmlFor="meeting-timezone">Zona horaria</label>
-          <input
-            id="meeting-timezone"
-            type="text"
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-          />
-        </div>
-
-        <div className="field">
           <label htmlFor="creator-name">Tu nombre</label>
           <input
             id="creator-name"
@@ -149,6 +104,24 @@ export default function CreateMeeting() {
             onChange={(e) => setCreatorName(e.target.value)}
           />
           <p className="field__hint">Serás el primer participante de la reunión.</p>
+        </div>
+
+        <div className="field">
+          <label htmlFor="meeting-timezone">Zona horaria</label>
+          <select
+            id="meeting-timezone"
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+          >
+            {getTimezoneOptions().map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="field__hint">
+            Los horarios de la reunión se muestran en esta zona.
+          </p>
         </div>
 
         {error !== null && (

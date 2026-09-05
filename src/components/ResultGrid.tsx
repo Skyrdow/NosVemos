@@ -8,6 +8,11 @@ interface ResultGridProps {
   cells: Cell[]
   allFreeRanges: AllFreeRange[]
   participants: Participant[]
+  /** Rango horario visible (solo display): minutos desde medianoche. */
+  timeStartMin?: number
+  timeEndMin?: number
+  /** Siempre muestra las columnas recurrentes Lun–Dom (vista "Semana"). */
+  forceWeeklyDays?: boolean
 }
 
 interface DayGroup {
@@ -27,6 +32,9 @@ export default function ResultGrid({
   cells,
   allFreeRanges,
   participants,
+  timeStartMin = 0,
+  timeEndMin = 1440,
+  forceWeeklyDays = false,
 }: ResultGridProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [focus, setFocus] = useState<Cell | null>(null)
@@ -37,6 +45,18 @@ export default function ResultGrid({
   const days = useMemo<DayGroup[]>(() => {
     const weekly = new Map<number, DayGroup>()
     const dates = new Map<string, DayGroup>()
+    if (forceWeeklyDays) {
+      // Vista "Semana": las columnas Lun–Dom se muestran siempre, aunque una
+      // columna no tenga ningún aporte (queda entera en gris).
+      for (let d = 0; d < 7; d++) {
+        weekly.set(d, {
+          key: `w:${d}`,
+          gridLabel: dayLabel(d),
+          dayOfWeek: d,
+          byBucket: new Map(),
+        })
+      }
+    }
     for (const cell of cells) {
       if (cell.dayOfWeek !== undefined) {
         let group = weekly.get(cell.dayOfWeek)
@@ -51,14 +71,14 @@ export default function ResultGrid({
         }
         group.byBucket.set(cell.startMin / granularityMin, cell)
       } else if (cell.date !== undefined) {
-let group = dates.get(cell.date)
-          if (group === undefined) {
-            group = {
-              key: `d:${cell.date}`,
-              gridLabel: formatShortDate(cell.date),
-              date: cell.date,
-              byBucket: new Map(),
-            }
+        let group = dates.get(cell.date)
+        if (group === undefined) {
+          group = {
+            key: `d:${cell.date}`,
+            gridLabel: formatShortDate(cell.date),
+            date: cell.date,
+            byBucket: new Map(),
+          }
           dates.set(cell.date, group)
         }
         group.byBucket.set(cell.startMin / granularityMin, cell)
@@ -71,7 +91,7 @@ let group = dates.get(cell.date)
       (a.date ?? '').localeCompare(b.date ?? ''),
     )
     return [...orderedWeekly, ...orderedDates]
-  }, [cells, granularityMin])
+  }, [cells, granularityMin, forceWeeklyDays])
 
   const { minBucket, maxBucket } = useMemo(() => {
     if (cells.length === 0) return { minBucket: 0, maxBucket: -1 }
@@ -86,12 +106,30 @@ let group = dates.get(cell.date)
     return { minBucket: min, maxBucket: max }
   }, [cells, granularityMin])
 
+  // Recorre el rango horario del usuario (display): los índices de bucket son
+  // absolutos, solo se recorta qué filas se renderizan.
+  const { rowFromBucket, rowToBucket } = useMemo(() => {
+    const first = Math.max(minBucket, Math.ceil(timeStartMin / granularityMin))
+    const last = Math.min(
+      maxBucket,
+      Math.floor((timeEndMin - 1) / granularityMin),
+    )
+    return { rowFromBucket: first, rowToBucket: last }
+  }, [minBucket, maxBucket, timeStartMin, timeEndMin, granularityMin])
+
+  const filteredAllFree = useMemo(() => {
+    // La lista respeta el rango horario visible.
+    return allFreeRanges.filter(
+      (r) => r.endMin > timeStartMin && r.startMin < timeEndMin,
+    )
+  }, [allFreeRanges, timeStartMin, timeEndMin])
+
   const visibleDays = days.filter((day) => {
     if (day.dayOfWeek !== undefined) return true
     return !collapsed.has(day.key)
   })
 
-  if (days.length === 0) {
+  if (cells.length === 0) {
     return (
       <div className="result" data-testid="result-empty">
         <p className="result__empty">
@@ -116,18 +154,24 @@ let group = dates.get(cell.date)
       {allFreeRanges.length > 0 && (
         <div className="result__holes" data-testid="allfree-ranges">
           <h3>🎯 Todos libres</h3>
-          <ul>
-            {allFreeRanges.map((range, i) => (
-              <li key={`${range.dayOfWeek ?? range.date}:${range.startMin}:${i}`}>
-                <strong>
-                  {range.dayOfWeek !== undefined
-                    ? dayLabel(range.dayOfWeek)
-                    : range.date}
-                </strong>{' '}
-                · {formatRange(range)} ({Math.round((range.endMin - range.startMin) / 60 * 10) / 10} h)
-              </li>
-            ))}
-          </ul>
+          {filteredAllFree.length > 0 ? (
+            <ul>
+              {filteredAllFree.map((range, i) => (
+                <li key={`${range.dayOfWeek ?? range.date}:${range.startMin}:${i}`}>
+                  <strong>
+                    {range.dayOfWeek !== undefined
+                      ? dayLabel(range.dayOfWeek)
+                      : range.date}
+                  </strong>{' '}
+                  · {formatRange(range)} ({Math.round((range.endMin - range.startMin) / 60 * 10) / 10} h)
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="result__holes-empty">
+              No hay huecos de disponibilidad en el rango horario seleccionado.
+            </p>
+          )}
         </div>
       )}
 
@@ -153,10 +197,11 @@ let group = dates.get(cell.date)
             </div>
           ))}
 
-          {Array.from(
-            { length: maxBucket - minBucket + 1 },
-            (_, i) => minBucket + i,
-          ).map((bucket) => (
+          {rowFromBucket <= rowToBucket &&
+            Array.from(
+              { length: rowToBucket - rowFromBucket + 1 },
+              (_, i) => rowFromBucket + i,
+            ).map((bucket) => (
             <div key={bucket} className="grid__row">
               <div className="grid__time" aria-hidden="true">
                 {formatMinutes(bucket * granularityMin)}

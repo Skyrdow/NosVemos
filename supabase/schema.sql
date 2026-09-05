@@ -6,8 +6,9 @@ create table public.meetings (
   slug text not null unique,
   title text not null,
   timezone text not null default 'UTC',
-  granularity_min int not null default 30,
-  duration_hint_min int,
+  granularity_min int not null default 60,
+  time_start_min int not null default 480,   -- rango horario visible (08:00)
+  time_end_min int not null default 1200,    -- rango horario visible (20:00)
   agenda_type text not null default 'hybrid'
     check (agenda_type in ('weekly','one_off','hybrid')),
   creator_name text,
@@ -42,6 +43,7 @@ alter table public.slots        enable row level security;
 
 create policy "anon leer reunión"    on public.meetings     for select using (true);
 create policy "anon crear reunión"   on public.meetings     for insert with check (true);
+create policy "anon update reunión"  on public.meetings     for update using (true) with check (true);
 create policy "anon leer participantes" on public.participants for select using (true);
 create policy "anon insert participantes" on public.participants for insert with check (true);
 create policy "anon leer slots"      on public.slots        for select using (true);

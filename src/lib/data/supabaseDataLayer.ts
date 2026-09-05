@@ -8,6 +8,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type {
   DataLayer,
   Meeting,
+  MeetingPatch,
   NewMeeting,
   NewParticipant,
   NewSlot,
@@ -22,7 +23,8 @@ interface MeetingRow {
   title: string
   timezone: string
   granularity_min: number
-  duration_hint_min: number | null
+  time_start_min: number
+  time_end_min: number
   agenda_type: string
   creator_name: string | null
   created_at: string
@@ -51,7 +53,8 @@ function toMeeting(row: MeetingRow): Meeting {
     title: row.title,
     timezone: row.timezone,
     granularityMin: row.granularity_min,
-    durationHintMin: row.duration_hint_min,
+    timeStartMin: row.time_start_min,
+    timeEndMin: row.time_end_min,
     agendaType: row.agenda_type as Meeting['agendaType'],
     creatorName: row.creator_name,
     createdAt: row.created_at,
@@ -93,7 +96,8 @@ export class SupabaseDataLayer implements DataLayer {
         title: data.title,
         timezone: data.timezone,
         granularity_min: data.granularityMin,
-        duration_hint_min: data.durationHintMin,
+        time_start_min: data.timeStartMin,
+        time_end_min: data.timeEndMin,
         agenda_type: data.agendaType,
         creator_name: data.creatorName,
       })
@@ -172,9 +176,44 @@ export class SupabaseDataLayer implements DataLayer {
     return (data as SlotRow[]).map(toSlot)
   }
 
+  async updateMeeting(id: string, patch: MeetingPatch): Promise<Meeting> {
+    const fields: Record<string, unknown> = {}
+    if (patch.title !== undefined) fields.title = patch.title
+    if (patch.timezone !== undefined) fields.timezone = patch.timezone
+    if (patch.granularityMin !== undefined) fields.granularity_min = patch.granularityMin
+    if (patch.timeStartMin !== undefined) fields.time_start_min = patch.timeStartMin
+    if (patch.timeEndMin !== undefined) fields.time_end_min = patch.timeEndMin
+    if (patch.agendaType !== undefined) fields.agenda_type = patch.agendaType
+    const { data, error } = await this.client
+      .from('meetings')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error !== null) throw error
+    return toMeeting(data as MeetingRow)
+  }
+
+  async clearMeetingSlots(meetingId: string): Promise<void> {
+    const participants = await this.getParticipants(meetingId)
+    const ids = participants.map((p) => p.id)
+    if (ids.length === 0) return
+    const { error } = await this.client
+      .from('slots')
+      .delete()
+      .in('participant_id', ids)
+    if (error !== null) throw error
+  }
+
   subscribeToMeeting(meetingId: string, onChange: () => void): Unsubscribe {
     const channel = this.client
       .channel(`meeting:${meetingId}`)
+      // Opciones de la reunión (granularidad/zona/agenda) editadas por el creador.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'meetings', filter: `id=eq.${meetingId}` },
+        onChange,
+      )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'participants', filter: `meeting_id=eq.${meetingId}` },

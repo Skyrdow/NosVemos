@@ -112,4 +112,104 @@ describe('ResultGrid (grilla agregada)', () => {
       /Todavía no hay aportes de disponibilidad/,
     )
   })
+
+  it('lista todos los huecos "todos libres" sin filtro de duración', () => {
+    const slots: ParticipantSlot[] = [
+      {
+        participantId: 'a',
+        name: 'Ana',
+        rules: [
+          { kind: 'weekly', dayOfWeek: 4, ranges: [[540, 570]] },
+          { kind: 'weekly', dayOfWeek: 2, ranges: [[540, 630]] },
+        ],
+      },
+      {
+        participantId: 'b',
+        name: 'Ben',
+        rules: [
+          { kind: 'weekly', dayOfWeek: 4, ranges: [[540, 570]] },
+          { kind: 'weekly', dayOfWeek: 2, ranges: [[540, 630]] },
+        ],
+      },
+      {
+        participantId: 'c',
+        name: 'Cris',
+        rules: [
+          { kind: 'weekly', dayOfWeek: 4, ranges: [[540, 570]] },
+          { kind: 'weekly', dayOfWeek: 2, ranges: [[540, 630]] },
+        ],
+      },
+    ]
+    const { cells, allFreeRanges } = computeIntersections(slots, 30)
+    render(
+      <ResultGrid
+        granularityMin={30}
+        cells={cells}
+        allFreeRanges={allFreeRanges}
+        participants={participants}
+      />,
+    )
+
+    // Se listan el hueco corto (30') y el largo (90') sin filtrar por duración.
+    expect(screen.getByTestId('allfree-ranges')).toHaveTextContent('Vie')
+    expect(screen.getByTestId('allfree-ranges')).toHaveTextContent('09:00–09:30')
+    expect(screen.getByTestId('allfree-ranges')).toHaveTextContent('Mié')
+    expect(screen.getByTestId('allfree-ranges')).toHaveTextContent('09:00–10:30')
+    expect(
+      screen.queryByText(/Mostrando huecos de al menos/i),
+    ).not.toBeInTheDocument()
+  })
+
+  it('recorta las filas al rango horario (solo display)', () => {
+    const { cells, allFreeRanges } = resultGridFor()
+    render(
+      <ResultGrid
+        granularityMin={30}
+        cells={cells}
+        allFreeRanges={allFreeRanges}
+        participants={participants}
+        timeStartMin={600}
+        timeEndMin={1440}
+      />,
+    )
+
+    // Los aportes de las 09:00 dejan de renderizarse…
+    expect(
+      screen.queryByRole('button', { name: /Lun 09:00–09:30/ }),
+    ).not.toBeInTheDocument()
+    // …y los del rango siguen apareciendo (10:00 de Cris, martes).
+    expect(
+      screen.getByRole('button', { name: /Mar 10:00–10:30: 1 de 3 libres/ }),
+    ).toBeInTheDocument()
+  })
+
+  it('fuerza las columnas semanales Lun–Dom en vista semana', () => {
+    const slots: ParticipantSlot[] = [
+      {
+        participantId: 'a',
+        name: 'Ana',
+        rules: [{ kind: 'weekly', dayOfWeek: 0, ranges: [[540, 600]] }],
+      },
+      {
+        participantId: 'b',
+        name: 'Ben',
+        rules: [{ kind: 'weekly', dayOfWeek: 2, ranges: [[600, 660]] }],
+      },
+    ]
+    const { cells, allFreeRanges } = computeIntersections(slots, 30)
+    render(
+      <ResultGrid
+        granularityMin={30}
+        cells={cells}
+        allFreeRanges={allFreeRanges}
+        participants={participants}
+        forceWeeklyDays
+      />,
+    )
+
+    // Las 7 columnas recurrentes están aunque Lun y Mié sean las únicas con aportes.
+    for (const label of ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+  })
 })

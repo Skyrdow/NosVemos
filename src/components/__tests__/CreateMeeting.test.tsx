@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import App from '../../App'
 
 describe('flujo crear reunión', () => {
-  it('crea la reunión, registra al creador y redirige a /m/<slug>', async () => {
+  it('crea la reunión con título+nombre+zona y redirige a /m/<slug>', async () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter initialEntries={['/']}>
@@ -13,17 +13,26 @@ describe('flujo crear reunión', () => {
       </MemoryRouter>,
     )
 
+    // El formulario es mínimo: título, nombre y select de zona horaria.
     await user.type(screen.getByLabelText('Título de la reunión'), 'Retro mensual')
     await user.type(screen.getByLabelText('Tu nombre'), 'Ana')
-    const durationInput = screen.getByLabelText('Duración mínima sugerida (min)')
-    // El campo ya trae "60" por defecto: limpiar antes de escribir el valor real
-    await user.clear(durationInput)
-    await user.type(durationInput, '45')
+    const timezoneSelect = screen.getByLabelText('Zona horaria')
+    expect(timezoneSelect).toBeInTheDocument()
+    // No hay más campos de configuración en el formulario de creación.
+    expect(
+      screen.queryByLabelText('Granularidad de la grilla'),
+    ).not.toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Crear reunión' }))
 
-    // El creador queda como participante y ve su grilla de aportes
+    // El creador queda como participante, ve su grilla y el botón de opciones
+    // (el panel vive en un popup que solo abre el anfitrión).
     expect(
       await screen.findByText(/Tu disponibilidad \(Ana\)/i),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Opciones/ }))
+    expect(
+      screen.getByRole('dialog', { name: 'Opciones de la reunión' }),
     ).toBeInTheDocument()
   })
 

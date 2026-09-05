@@ -38,9 +38,13 @@ npm run build  # typecheck + build de producción
 1. Creá un proyecto en [Supabase](https://supabase.com) (Plan Free alcanza).
 2. En **SQL Editor** → New query, pegá el contenido de `supabase/schema.sql` y
    ejecutalo. Crea las tablas `meetings`, `participants`, `slots`, índices y las
-   políticas RLS anónimas (MVP de link compartido). Nota: `slots` incluye
-   política `select`/`insert`/`delete` — el `delete` es necesario porque
-   `saveSlots` reemplaza las reglas borrando las anteriores antes de insertar.
+   políticas RLS anónimas (MVP de link compartido). `meetings` incluye el rango
+   horario de la reunión (`time_start_min`/`time_end_min`, default 08:00–20:00)
+   y políticas `select`/`insert`/`update` (el creador puede ajustar las
+   opciones). `slots` tiene `select`/`insert`/`delete` — el `delete` es
+   necesario porque `saveSlots` reemplaza las reglas borrando las anteriores
+   antes de insertar, y el "borrar disponibilidad de todos" (al cambiar
+   opciones) hace un delete masivo.
 3. En **Project Settings → API**, copiá:
    - `Project URL` → `VITE_SUPABASE_URL`
    - `anon public` key → `VITE_SUPABASE_ANON_KEY` (clave **publishable**, segura en el cliente)
@@ -59,10 +63,10 @@ npm run build  # typecheck + build de producción
 
 ### Realtime
 
-La suscripción a cambios (nuevos participantes / nuevos aportes) se hace por
-Realtime: `participants` (filtrados por reunión) y `slots` se escuchan y la
-grilla se recalcula al vuelo. En modo memoria, el data layer emite los mismos
-eventos localmente.
+La suscripción a cambios (opciones de la reunión, nuevos participantes y nuevos
+aportes) se hace por Realtime: `meetings` (filtrados por reunión), `participants`
+(filtrados por reunión) y `slots` se escuchan y la grilla se recalcula al vuelo.
+En modo memoria, el data layer emite los mismos eventos localmente.
 
 ## Seguridad
 
@@ -90,6 +94,9 @@ src/
     CreateMeeting.tsx     # /  crear reunión
     JoinMeeting.tsx       # /m/:slug  unirse/participar
   components/
+    MeetingOptions.tsx    # popup de opciones de la reunión (solo anfitrión)
+    CalendarPreview.tsx   # mini grilla estática (opciones del creador)
+    MonthCalendar.tsx     # calendario mensual (semanas + mes por popup)
     AvailabilityGrid.tsx  # input de disponibilidad (clic/arrastre)
     ResultGrid.tsx        # grilla agregada con colores y detalle
     NamePrompt.tsx        # pedido de nombre al participar

@@ -1,15 +1,14 @@
 import { useMemo, useRef, useState } from 'react'
 import type { AgendaType } from '../lib/data/types'
-import type { Rule } from '../lib/intersect'
-import { isValidRule } from '../lib/intersect'
-import { DAY_LABELS } from '../lib/intersect'
-import { formatMinutes, formatShortDate, todayISO } from '../lib/utils'
+import { DAY_LABELS, isValidRule, type Rule } from '../lib/intersect'
 import {
   bucketsToRanges,
   rulesToSelection,
   selectionToRules,
   type DayKey,
 } from '../lib/rules'
+import { formatFullDate, formatMinutes, formatShortDate, mondayOf, todayISO } from '../lib/utils'
+import MonthCalendar from './MonthCalendar'
 
 interface AvailabilityGridProps {
   granularityMin: number
@@ -17,7 +16,12 @@ interface AvailabilityGridProps {
   initialRules: Rule[]
   onSave: (rules: Rule[]) => Promise<void> | void
   saving?: boolean
+  /** Rango horario visible (solo display): minutos desde medianoche. */
+  timeStartMin?: number
+  timeEndMin?: number
 }
+
+type Mode = 'week' | 'calendar'
 
 interface DragState {
   /** Solo permite arrastrar dentro de una misma columna de día. */
@@ -26,33 +30,51 @@ interface DragState {
   mode: 'select' | 'deselect'
 }
 
-const TOTAL_BUCKETS = 1440
-
 export default function AvailabilityGrid({
   granularityMin,
   agendaType,
   initialRules,
   onSave,
   saving = false,
+  timeStartMin = 0,
+  timeEndMin = 1440,
 }: AvailabilityGridProps) {
-  const canWeekly = agendaType === 'weekly' || agendaType === 'hybrid'
-  const canOneOff = agendaType === 'one_off' || agendaType === 'hybrid'
+  // Sin toggle: el modo viene solo del tipo de agenda. `weekly` (o `hybrid`
+  // legacy) → grilla semanal recurrente; `one_off` → calendario + día puntual.
+  const mode: Mode = agendaType === 'one_off' ? 'calendar' : 'week'
 
-  const [mode, setMode] = useState<'weekly' | 'one_off'>(() =>
-    canOneOff && !canWeekly ? 'one_off' : 'weekly',
-  )
   const [selection, setSelection] = useState<Map<DayKey, Set<number>>>(() =>
     rulesToSelection(initialRules, granularityMin),
   )
-  const [activeDate, setActiveDate] = useState(todayISO)
-  const [dateError, setDateError] = useState<string | null>(null)
+  const [activeDate, setActiveDate] = useState<string>(() => {
+    const firstOneOff = initialRules.find((r) => r.kind === 'one_off')
+    return firstOneOff?.date ?? todayISO()
+  })
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [columnKey, setColumnKey] = useState(0)
   const dragState = useRef<DragState | null>(null)
 
-  const rowCount = useMemo(() => TOTAL_BUCKETS / granularityMin, [granularityMin])
+  // Días puntuales con disponibilidad ya guardada (reglas one_off del usuario).
+  const filledDates = useMemo(
+    () =>
+      [...selection.keys()]
+        .filter((key) => key.startsWith('d:'))
+        .map((key) => key.slice(2)),
+    [selection],
+  )
+
+  // Buckets visibles: solo los que empiezan dentro del rango. Los índices de
+  // bucket son absolutos (minutos / granularidad), el rango es solo display.
+  const visibleBuckets = useMemo(() => {
+    const first = Math.ceil(timeStartMin / granularityMin)
+    const last = Math.floor((timeEndMin - 1) / granularityMin)
+    const list: number[] = []
+    for (let b = first; b <= last; b++) list.push(b)
+    return list
+  }, [timeStartMin, timeEndMin, granularityMin])
 
   const days: DayKey[] =
-    mode === 'weekly'
+    mode === 'week'
       ? ([0, 1, 2, 3, 4, 5, 6].map((d) => `w:${d}`) as DayKey[])
       : ([`d:${activeDate}`] as DayKey[])
 
@@ -113,21 +135,19 @@ export default function AvailabilityGrid({
     dragState.current = null
   }
 
-  function handleAddDate(event: React.FormEvent) {
-    event.preventDefault()
-    if (!activeDate) return
-    setDateError(null)
-    // Cambia el día activo: la selección de ese día se sigue guardando por clave.
+  /** Cambia el día a marcar (desde el calendario) y reinicia el canvas. */
+  function selectDate(dateISO: string) {
+    setActiveDate(dateISO)
     setColumnKey((k) => k + 1)
   }
 
   async function handleSave() {
     const rules = selectionToRules(selection, granularityMin)
     if (!rules.every(isValidRule)) {
-      setDateError('Las franjas seleccionadas no son válidas (verificá los horarios).')
+      setSaveError('Las franjas seleccionadas no son válidas (verificá los horarios).')
       return
     }
-    setDateError(null)
+    setSaveError(null)
     await onSave(rules)
   }
 
@@ -135,48 +155,25 @@ export default function AvailabilityGrid({
 
   return (
     <div className="av-grid" onMouseUp={endDrag} onMouseLeave={endDrag}>
-      <div className="av-grid__toolbar">
-        <div className="av-grid__modes" role="tablist" aria-label="Tipo de aporte">
-          {canWeekly && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === 'weekly'}
-              className={mode === 'weekly' ? 'is-active' : ''}
-              onClick={() => setMode('weekly')}
-            >
-              Semana recurrente
-            </button>
-          )}
-          {canOneOff && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === 'one_off'}
-              className={mode === 'one_off' ? 'is-active' : ''}
-              onClick={() => {
-                setMode('one_off')
-                setColumnKey((k) => k + 1)
-              }}
-            >
-              Día puntual
-            </button>
-          )}
+      {mode === 'calendar' && (
+        <div className="av-grid__calendar">
+          {/* Sin remount ligado a activeDate: el mes solo cambia con las
+              flechas o el popup de la etiqueta del calendario. */}
+          <MonthCalendar
+            mondayISO={mondayOf(activeDate)}
+            onSelectWeek={(monday) => selectDate(monday)}
+            onSelectDay={selectDate}
+            selectedDate={activeDate}
+            filledDates={filledDates}
+          />
         </div>
+      )}
 
-        {mode === 'one_off' && (
-          <form className="av-grid__date" onSubmit={handleAddDate}>
-            <label htmlFor="av-date">Fecha</label>
-            <input
-              id="av-date"
-              type="date"
-              value={activeDate}
-              onChange={(e) => setActiveDate(e.target.value)}
-            />
-            <button type="submit">Ir</button>
-          </form>
-        )}
-      </div>
+      {mode === 'calendar' && (
+        <p className="av-grid__day-title" data-testid="av-day-title">
+          {formatFullDate(activeDate)}
+        </p>
+      )}
 
       <div className="av-grid__canvas" key={columnKey}>
         <div
@@ -191,7 +188,7 @@ export default function AvailabilityGrid({
             </div>
           ))}
 
-          {Array.from({ length: rowCount }, (_, i) => i).map((bucket) => (
+          {visibleBuckets.map((bucket) => (
             <div key={bucket} className="grid__row">
               <div className="grid__time" aria-hidden="true">
                 {formatMinutes(bucket * granularityMin)}
@@ -224,9 +221,9 @@ export default function AvailabilityGrid({
         automáticamente.
       </p>
 
-      {dateError !== null && (
+      {saveError !== null && (
         <p className="av-grid__error" role="alert">
-          {dateError}
+          {saveError}
         </p>
       )}
 

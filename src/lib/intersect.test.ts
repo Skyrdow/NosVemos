@@ -191,6 +191,30 @@ describe('computeIntersections — casos obligatorios', () => {
     expect(f30).toHaveLength(2)
     expect(f60).toHaveLength(1)
   })
+
+  it('acepta granularidades de 90 y 120 minutos (divisores de 1440)', () => {
+    const slots = [
+      slot('a', 'Ana', [weekly(0, [[9 * 60, 10 * 60]])]),
+      slot('b', 'Ben', [weekly(0, [[9 * 60, 10 * 60]])]),
+    ]
+    // La hora 09:00-10:00 cae dentro de un único bucket de 90 min [540,630)
+    // y de uno de 120 min [480,600). La intersección respeta el bucket.
+    const { cells: cells90 } = computeIntersections(slots, 90)
+    const f90 = cells90.filter((c) => c.allFree)
+    expect(f90).toHaveLength(1)
+    expect(f90[0]).toMatchObject({ dayOfWeek: 0, startMin: 540, endMin: 630 })
+
+    const { cells: cells120 } = computeIntersections(slots, 120)
+    const f120 = cells120.filter((c) => c.allFree)
+    expect(f120).toHaveLength(1)
+    expect(f120[0]).toMatchObject({ dayOfWeek: 0, startMin: 480, endMin: 600 })
+  })
+
+  it('rechaza granularidades inválidas con el mensaje "entre 1 y 120"', () => {
+    const safe = [slot('a', 'Ana', [weekly(0, [[0, 60]])])]
+    expect(() => computeIntersections(safe, 0)).toThrow(/1 y 120/)
+    expect(() => computeIntersections(safe, 1441)).toThrow(/1 y 120/)
+  })
 })
 
 describe('perf smoke: 100 participantes < 50ms', () => {

@@ -7,6 +7,7 @@
 import type {
   DataLayer,
   Meeting,
+  MeetingPatch,
   NewMeeting,
   NewParticipant,
   NewSlot,
@@ -42,7 +43,8 @@ export class MemoryDataLayer implements DataLayer {
       title: data.title,
       timezone: data.timezone,
       granularityMin: data.granularityMin,
-      durationHintMin: data.durationHintMin,
+      timeStartMin: data.timeStartMin,
+      timeEndMin: data.timeEndMin,
       agendaType: data.agendaType,
       creatorName: data.creatorName,
       createdAt: new Date().toISOString(),
@@ -110,6 +112,28 @@ export class MemoryDataLayer implements DataLayer {
       }
     }
     return saved
+  }
+
+  async updateMeeting(id: string, patch: MeetingPatch): Promise<Meeting> {
+    const meeting = this.meetings.get(id)
+    if (meeting === undefined) throw new Error('Reunión no encontrada')
+    const updated: Meeting = { ...meeting, ...patch }
+    this.meetings.set(id, updated)
+    this.notify(id)
+    return updated
+  }
+
+  async clearMeetingSlots(meetingId: string): Promise<void> {
+    const participantIds = new Set(
+      [...this.participants.values()]
+        .filter((p) => p.meetingId === meetingId)
+        .map((p) => p.id),
+    )
+    if (participantIds.size === 0) return
+    for (const slot of [...this.slots.values()]) {
+      if (participantIds.has(slot.participantId)) this.slots.delete(slot.id)
+    }
+    this.notify(meetingId)
   }
 
   subscribeToMeeting(meetingId: string, onChange: () => void): Unsubscribe {
