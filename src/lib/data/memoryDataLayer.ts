@@ -100,17 +100,10 @@ export class MemoryDataLayer implements DataLayer {
       this.slots.set(full.id, full)
       return full
     })
-    const meeting = [...this.participants.values()].find(
+    const owner = [...this.participants.values()].find(
       (p) => p.id === participantId,
     )
-    if (meeting) this.notify(meeting.meetingId)
-    else {
-      const slotMeeting = [...this.slots.values()][0]
-      if (slotMeeting) {
-        const owner = this.participants.get(slotMeeting.participantId)
-        if (owner) this.notify(owner.meetingId)
-      }
-    }
+    if (owner) this.notify(owner.meetingId)
     return saved
   }
 

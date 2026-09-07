@@ -34,3 +34,10 @@ Convenciones compartidas para los agentes de este proyecto (Builder y Evaluator)
 - `npm run build`   — typecheck + build de producción
 - `npm run lint`    — lint
 - `npm test`        — tests
+
+## YAGNI / minimalismo
+
+- **YAGNI**: no agregues features, props, archivos ni abstracciones que todavía no se usan.
+- Preferí la solución más simple que funcione; si alcanza con **un cambio de 1 línea**, ese es el correcto.
+- No dejes código muerto: cortá lo que sobre aunque esté "bien escrito".
+- Antes de escribir código nuevo, chequear repetida (duplicación) con algo existente que ya resuelva el caso.

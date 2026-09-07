@@ -45,6 +45,9 @@ npm run build  # typecheck + build de producción
    necesario porque `saveSlots` reemplaza las reglas borrando las anteriores
    antes de insertar, y el "borrar disponibilidad de todos" (al cambiar
    opciones) hace un delete masivo.
+   Luego aplica también `supabase/realtime.sql` (o activa Realtime para las tres
+   tablas en *Database → Replication*): así los cambios de disponibilidad llegan
+   solos a los participantes, sin recargar.
 3. En **Project Settings → API**, copia:
    - `Project URL` → `VITE_SUPABASE_URL`
    - `anon public` key → `VITE_SUPABASE_ANON_KEY` (clave **publishable**, segura en el cliente)

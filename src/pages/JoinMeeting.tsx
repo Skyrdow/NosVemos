@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import AvailabilityGrid from '../components/AvailabilityGrid'
 import MeetingOptions from '../components/MeetingOptions'
@@ -89,10 +89,7 @@ export default function JoinMeeting() {
       .then((found) => {
         if (cancelled) return
         if (found === null) setLoadState('notfound')
-        else {
-          setMeeting(found)
-          setLoadState('ready')
-        }
+        else setMeeting(found)
       })
       .catch(() => {
         if (!cancelled) setLoadState('error')
@@ -102,18 +99,54 @@ export default function JoinMeeting() {
     }
   }, [slug])
 
+  // Recarga de datos agrupada: un solo "guardar" borra e inserta N slots y cada
+  // evento realtime suelto no amerita N recargas. Al enfocar la pestaña también
+  // se recarga (fallback a prueba de cierres si realtime está apagado).
+  const debounceTimer = useRef<number | null>(null)
+  const refreshOnChange = useCallback(() => {
+    if (debounceTimer.current !== null) window.clearTimeout(debounceTimer.current)
+    debounceTimer.current = window.setTimeout(() => {
+      debounceTimer.current = null
+      void loadData().catch(() => {
+        // Falla transitoria: los datos vuelven con el próximo evento o focus.
+      })
+    }, 250)
+  }, [loadData])
+
   // Carga inicial + suscripción al realtime de la reunión (memory: eventos locales).
+  // El estado pasa a 'ready' recién cuando la sesión recordada ya se restauró:
+  // así el F5 no parpadea con la pantalla de "Súmate a".
   useEffect(() => {
     if (!meeting) return
     const run = async () => {
-      await loadData()
+      try {
+        await loadData()
+      } catch {
+        setLoadState((s) => (s === 'loading' ? 'error' : s))
+        return
+      }
+      setLoadState((s) => (s === 'loading' ? 'ready' : s))
     }
     void run()
-    const unsubscribe = dataLayer.subscribeToMeeting(meeting.id, () => {
-      void loadData()
-    })
-    return unsubscribe
-  }, [meeting, loadData])
+    const unsubscribe = dataLayer.subscribeToMeeting(meeting.id, refreshOnChange)
+    return () => {
+      if (debounceTimer.current !== null) window.clearTimeout(debounceTimer.current)
+      unsubscribe()
+    }
+  }, [meeting, loadData, refreshOnChange])
+
+  useEffect(() => {
+    if (!meeting) return
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') refreshOnChange()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [meeting, refreshOnChange])
 
   const slotsInput = useMemo(
     () =>
@@ -266,7 +299,7 @@ export default function JoinMeeting() {
       await navigator.clipboard.writeText(url)
     } catch {
       // Sin portapapeles disponible: mostrar el link para copiar manualmente
-      window.prompt('Copiá el link:', url)
+      window.prompt('Copia el link:', url)
     }
   }
 

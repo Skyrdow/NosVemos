@@ -111,8 +111,3 @@ export function slotToRule(slot: Slot): Rule {
     ? { kind: 'weekly', dayOfWeek: slot.dayOfWeek ?? 0, ranges: slot.ranges }
     : { kind: 'one_off', date: slot.date ?? '', ranges: slot.ranges }
 }
-
-/** Slots persistidos → reglas del motor. */
-export function slotsToRules(slots: Slot[]): Rule[] {
-  return slots.map(slotToRule)
-}

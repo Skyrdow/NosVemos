@@ -54,3 +54,7 @@ create policy "anon insert participantes" on public.participants for insert with
 create policy "anon leer slots"      on public.slots        for select using (true);
 create policy "anon insert slots"    on public.slots        for insert with check (true);
 create policy "anon delete slots"    on public.slots        for delete using (true);
+
+-- Realtime: las tablas entran a la publicación `supabase_realtime` con
+-- supabase/realtime.sql (aditivo, idempotente). No se incluye aquí porque este
+-- archivo es destructivo; para un esquema nuevo basta correr realtime.sql luego.

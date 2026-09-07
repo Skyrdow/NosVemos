@@ -374,4 +374,65 @@ describe('flujo unirse a una reunión', () => {
       expect(screen.getAllByText(label).length).toBeGreaterThanOrEqual(1)
     }
   })
+
+  it('al recargar (F5) no parpadea la pantalla de presentación si hay sesión recordada', async () => {
+    const meeting = await createMeetingFixture()
+    const participants = await dataLayer.getParticipants(meeting.id)
+    const ana = participants.find((p) => p.name === 'Ana')!
+    sessionStorage.clear()
+    rememberParticipant(meeting.id, ana.id)
+
+    // Latencia de red en la primera carga: mientras la sesión se restaura solo
+    // se ve la pantalla de carga, nunca la de "Súmate a".
+    const original = dataLayer.getMeetingBySlug.bind(dataLayer)
+    dataLayer.getMeetingBySlug = async (slug: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      return original(slug)
+    }
+    try {
+      render(
+        <MemoryRouter initialEntries={[`/m/${meeting.slug}`]}>
+          <App />
+        </MemoryRouter>,
+      )
+      expect(screen.queryByText(/Súmate a/)).not.toBeInTheDocument()
+      expect(
+        await screen.findByText(/Tu disponibilidad \(Ana\)/i),
+      ).toBeInTheDocument()
+      expect(screen.queryByText(/Súmate a/)).not.toBeInTheDocument()
+    } finally {
+      dataLayer.getMeetingBySlug = original
+    }
+  })
+
+  it('los cambios de otra persona llegan solos (real-time / recarga al enfocar)', async () => {
+    const meeting = await createMeetingFixture()
+    const participants = await dataLayer.getParticipants(meeting.id)
+    const ana = participants.find((p) => p.name === 'Ana')!
+    const ben = participants.find((p) => p.name === 'Ben')!
+    sessionStorage.clear()
+    rememberParticipant(meeting.id, ana.id)
+
+    render(
+      <MemoryRouter initialEntries={[`/m/${meeting.slug}`]}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(/Tu disponibilidad \(Ana\)/i)).toBeInTheDocument()
+    expect(screen.getByTestId('result-empty')).toBeInTheDocument()
+
+    // Ben guarda desde su dispositivo; sin recargar con F5 la página ve el
+    // aporte (evento realtime de la capa de datos + recarga al enfocar).
+    await dataLayer.saveSlots(ben.id, [
+      { kind: 'weekly', dayOfWeek: 0, date: null, ranges: [[540, 600]] },
+    ])
+    window.dispatchEvent(new Event('focus'))
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Lun 09:00–09:30: 1 de 2 libres',
+      }),
+    ).toBeInTheDocument()
+    expect(screen.queryByTestId('result-empty')).not.toBeInTheDocument()
+  })
 })
