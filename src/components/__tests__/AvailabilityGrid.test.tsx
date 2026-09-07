@@ -285,4 +285,49 @@ describe('AvailabilityGrid (input de disponibilidad)', () => {
       { kind: 'weekly', dayOfWeek: 0, ranges: [[600, 630]] },
     ])
   })
+
+  it('avisa y destaca el guardado mientras haya cambios sin guardar', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn<(rules: Rule[]) => Promise<void>>(() => Promise.resolve())
+
+    const grid = (
+      <AvailabilityGrid
+        granularityMin={30}
+        agendaType="weekly"
+        activeDate={todayISO()}
+        initialRules={[]}
+        onSave={onSave}
+      />
+    )
+
+    const view = render(grid)
+
+    // Sin cambios: no hay aviso ni destaque.
+    expect(screen.queryByText('Cambios sin guardar')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Guardar/ }).className,
+    ).not.toContain('btn--attention')
+
+    // Al marcar una franja aparece el aviso y el botón destaca.
+    await user.click(
+      screen.getByRole('button', { name: 'Lun 09:00–09:30 ocupado' }),
+    )
+    expect(screen.getByText('Cambios sin guardar')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Guardar disponibilidad/ }).className,
+    ).toContain('btn--attention')
+
+    // Tras guardar, JoinMeeting remonta la grilla con las reglas guardadas:
+    // remontar muestra el estado limpio de nuevo.
+    await user.click(
+      screen.getByRole('button', { name: /Guardar disponibilidad/ }),
+    )
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    view.unmount()
+    render(grid)
+    expect(screen.queryByText('Cambios sin guardar')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Guardar \(sin franjas\)/ }).className,
+    ).not.toContain('btn--attention')
+  })
 })

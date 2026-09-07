@@ -854,6 +854,35 @@ button.month__day--selected:hover {
 
 .av-grid__actions {
   align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Aviso sutil de cambios sin guardar + destaque del botón de guardado. */
+.av-grid__dirty {
+  font-size: 12px;
+  color: var(--cell-partial);
+}
+
+.btn--attention {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  animation: btn-pulse 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes btn-pulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn--attention {
+    animation: none;
+  }
 }
 
 /* ===== Resultados ===== */

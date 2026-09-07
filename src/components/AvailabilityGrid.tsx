@@ -31,6 +31,18 @@ interface DragState {
   mode: 'select' | 'deselect'
 }
 
+function sameSelection(a: Map<DayKey, Set<number>>, b: Map<DayKey, Set<number>>): boolean {
+  if (a.size !== b.size) return false
+  for (const [key, buckets] of a) {
+    const other = b.get(key)
+    if (other === undefined || other.size !== buckets.size) return false
+    for (const bucket of buckets) {
+      if (!other.has(bucket)) return false
+    }
+  }
+  return true
+}
+
 export default function AvailabilityGrid({
   granularityMin,
   agendaType,
@@ -52,6 +64,18 @@ export default function AvailabilityGrid({
   )
   const [saveError, setSaveError] = useState<string | null>(null)
   const dragState = useRef<DragState | null>(null)
+
+  // "Sucio" = hay franjas marcadas que difieren de lo último guardado
+  // (lo que trae `initialRules`; tras guardar, JoinMeeting remonta con el
+  // nuevo estado y el aviso desaparece).
+  const savedSelection = useMemo(
+    () => rulesToSelection(initialRules, granularityMin),
+    [initialRules, granularityMin],
+  )
+  const dirty = useMemo(
+    () => !sameSelection(selection, savedSelection),
+    [selection, savedSelection],
+  )
 
   // Buckets visibles: solo los que empiezan dentro del rango. Los índices de
   // bucket son absolutos (minutos / granularidad), el rango es solo display.
@@ -214,12 +238,17 @@ export default function AvailabilityGrid({
       <div className="av-grid__actions">
         <button
           type="button"
-          className="btn btn--primary"
+          className={`btn btn--primary${dirty && !saving ? ' btn--attention' : ''}`}
           disabled={saving}
           onClick={() => void handleSave()}
         >
           {saving ? 'Guardando…' : hasSelection ? 'Guardar disponibilidad' : 'Guardar (sin franjas)'}
         </button>
+        {dirty && !saving && (
+          <span className="av-grid__dirty" role="status">
+            Cambios sin guardar
+          </span>
+        )}
       </div>
     </div>
   )

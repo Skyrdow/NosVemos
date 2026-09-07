@@ -102,6 +102,8 @@ describe('flujo unirse a una reunión', () => {
     await user.click(
       screen.getByRole('button', { name: 'Lun 09:30–10:00 ocupado' }),
     )
+    // Hay cambios sin guardar: el aviso sutil está visible.
+    expect(screen.getByText('Cambios sin guardar')).toBeInTheDocument()
     await user.click(
       screen.getByRole('button', { name: /Guardar disponibilidad/ }),
     )
@@ -113,6 +115,11 @@ describe('flujo unirse a una reunión', () => {
       for (const cell of freeCells) {
         expect(cell).toHaveTextContent('3')
       }
+    })
+
+    // Al remontar con las reglas guardadas, el aviso desaparece.
+    await waitFor(() => {
+      expect(screen.queryByText('Cambios sin guardar')).not.toBeInTheDocument()
     })
 
     // Y los "huecos donde todos pueden" se resumen arriba
